@@ -7,6 +7,7 @@ import Vendas from './pages/Vendas'
 import Despesas from './pages/Despesas'
 import Reposicao from './pages/Reposicao'
 import PrivateRoute from './routes/PrivateRoute'
+import Precificacao from './pages/Precificacao'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
           <Route path="vendas" element={<Vendas />} />
           <Route path="despesas" element={<Despesas />} />
           <Route path="reposicao" element={<Reposicao />} />
+          <Route path="precificacao" element={<Precificacao />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

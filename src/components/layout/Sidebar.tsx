@@ -9,6 +9,7 @@ const navItems = [
   { section: 'Estoque', items: [
     { to: '/produtos', label: 'Produtos' },
     { to: '/reposicao', label: 'Reposição' },
+    { to: '/precificacao', label: 'Precificação' },
   ]},
   { section: 'Financeiro', items: [
     { to: '/despesas', label: 'Despesas' },
