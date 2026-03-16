@@ -314,7 +314,7 @@ export default function Reposicao() {
         {orderItems.length > 0 ? (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-white/5">
                     <th className="text-left px-3 py-2 text-white/30 font-normal w-8"></th>
@@ -343,7 +343,7 @@ export default function Reposicao() {
                         />
                       </td>
 
-                      <td className="px-3 py-2 text-white/80">{s.productName}</td>
+                      <td className="px-3 py-2 text-white/80 whitespace-nowrap">{s.productName}</td>
 
                       <td className="px-3 py-2 text-white/40 hidden md:table-cell">
                         {s.categoryName ?? '—'}
@@ -382,17 +382,17 @@ export default function Reposicao() {
               </table>
             </div>
 
-            <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+            <div className="flex flex-col md:flex-row md:items-center gap-3 pt-2 border-t border-white/5">
               <input
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Observações (opcional)"
-                className="flex-1 bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                className="w-full md:flex-1 bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
               />
 
               <button
                 onClick={handleConfirm}
-                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                className="w-full md:w-auto bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
                 Gerar pedido ({selectedCount}) + PDF
               </button>
@@ -419,90 +419,92 @@ export default function Reposicao() {
             Nenhum pedido gerado ainda
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-white/5">
-                <th className="text-left px-4 py-3 text-white/30 font-normal w-6"></th>
-                <th className="text-left px-4 py-3 text-white/30 font-normal">Data</th>
-                <th className="text-left px-4 py-3 text-white/30 font-normal hidden md:table-cell">Observações</th>
-                <th className="text-center px-4 py-3 text-white/30 font-normal">Itens</th>
-                <th className="text-right px-4 py-3 text-white/30 font-normal">PDF</th>
-              </tr>
-            </thead>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-white/5">
+                  <th className="text-left px-4 py-3 text-white/30 font-normal w-6"></th>
+                  <th className="text-left px-4 py-3 text-white/30 font-normal">Data</th>
+                  <th className="text-left px-4 py-3 text-white/30 font-normal hidden md:table-cell">Observações</th>
+                  <th className="text-center px-4 py-3 text-white/30 font-normal">Itens</th>
+                  <th className="text-right px-4 py-3 text-white/30 font-normal">PDF</th>
+                </tr>
+              </thead>
 
-            <tbody>
-              {orders.map(order => (
-                <>
-                  <tr
-                    key={order.id}
-                    className="border-b border-white/5 hover:bg-white/2 cursor-pointer"
-                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                  >
-                    <td className="px-4 py-3 text-white/30 text-xs">
-                      {expandedOrder === order.id ? '▾' : '▸'}
-                    </td>
+              <tbody>
+                {orders.map(order => (
+                  <>
+                    <tr
+                      key={order.id}
+                      className="border-b border-white/5 hover:bg-white/2 cursor-pointer"
+                      onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                    >
+                      <td className="px-4 py-3 text-white/30 text-xs">
+                        {expandedOrder === order.id ? '▾' : '▸'}
+                      </td>
 
-                    <td className="px-4 py-3 text-white/70">
-                      {new Date(order.createdAt).toLocaleDateString('pt-BR')}
-                    </td>
+                      <td className="px-4 py-3 text-white/70 whitespace-nowrap">
+                        {new Date(order.createdAt).toLocaleDateString('pt-BR')}
+                      </td>
 
-                    <td className="px-4 py-3 text-white/40 hidden md:table-cell">
-                      {order.notes ?? '—'}
-                    </td>
+                      <td className="px-4 py-3 text-white/40 hidden md:table-cell">
+                        {order.notes ?? '—'}
+                      </td>
 
-                    <td className="px-4 py-3 text-center text-white/50">
-                      {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}
-                    </td>
+                      <td className="px-4 py-3 text-center text-white/50 whitespace-nowrap">
+                        {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}
+                      </td>
 
-                    <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                      <button
-                        onClick={() => downloadPdf(order.id)}
-                        className="text-[#4e90d9] hover:text-white text-xs transition-colors"
-                      >
-                        ↓ PDF
-                      </button>
-                    </td>
-                  </tr>
-
-                  {expandedOrder === order.id && (
-                    <tr key={`${order.id}-items`} className="border-b border-white/5 bg-white/2">
-                      <td colSpan={5} className="px-8 py-3">
-                        <div className="flex flex-col gap-1">
-                          <p className="text-white/20 text-xs mb-1">Itens do pedido</p>
-
-                          {order.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between py-1 border-b border-white/5 last:border-0"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="text-white/70 text-xs">{item.productName}</span>
-                                {item.categoryName && (
-                                  <span className="text-white/30 text-xs">{item.categoryName}</span>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-4 text-xs">
-                                <span className="text-white/30">
-                                  Estoque: <span className="text-red-400">{item.currentStock}</span>
-                                </span>
-                                <span className="text-white/30">
-                                  Sugerido: <span className="text-white/50">{item.suggestedQuantity}</span>
-                                </span>
-                                <span className="text-white/30">
-                                  Pedido: <span className="text-white/70 font-medium">{item.orderedQuantity}</span>
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      <td className="px-4 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => downloadPdf(order.id)}
+                          className="text-[#4e90d9] hover:text-white text-xs transition-colors"
+                        >
+                          ↓ PDF
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
+
+                    {expandedOrder === order.id && (
+                      <tr key={`${order.id}-items`} className="border-b border-white/5 bg-white/2">
+                        <td colSpan={5} className="px-8 py-3">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-white/20 text-xs mb-1">Itens do pedido</p>
+
+                            {order.items.map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between py-1 border-b border-white/5 last:border-0 gap-4"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <span className="text-white/70 text-xs whitespace-nowrap">{item.productName}</span>
+                                  {item.categoryName && (
+                                    <span className="text-white/30 text-xs whitespace-nowrap">{item.categoryName}</span>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center gap-4 text-xs whitespace-nowrap">
+                                  <span className="text-white/30">
+                                    Estoque: <span className="text-red-400">{item.currentStock}</span>
+                                  </span>
+                                  <span className="text-white/30">
+                                    Sugerido: <span className="text-white/50">{item.suggestedQuantity}</span>
+                                  </span>
+                                  <span className="text-white/30">
+                                    Pedido: <span className="text-white/70 font-medium">{item.orderedQuantity}</span>
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

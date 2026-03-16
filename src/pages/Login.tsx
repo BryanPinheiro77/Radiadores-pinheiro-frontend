@@ -44,7 +44,7 @@ function Login() {
               value={login}
               onChange={(e) => setLogin(e.target.value)}
               className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-[#4e90d9] transition-colors"
-              placeholder="seu login"
+              placeholder="Login"
               required
             />
           </div>
@@ -56,7 +56,7 @@ function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-[#4e90d9] transition-colors"
-              placeholder="••••••••"
+              placeholder="Senha"
               required
             />
           </div>
