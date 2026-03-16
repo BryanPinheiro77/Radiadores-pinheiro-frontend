@@ -13,6 +13,7 @@ const navItems = [
   ]},
   { section: 'Financeiro', items: [
     { to: '/despesas', label: 'Despesas' },
+    { to: '/relatorios', label: 'Relatórios' },
   ]},
 ]
 

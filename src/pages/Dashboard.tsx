@@ -17,7 +17,7 @@ export default function Dashboard() {
 
   const today = new Date()
   const start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
-  const end = today.toISOString().split('T')[0]
+  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
 
   useEffect(() => {
     api.get<ReportResponse>(`/api/reports?start=${start}&end=${end}`)

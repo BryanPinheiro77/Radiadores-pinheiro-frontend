@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
-import type { Sale, Product, Page } from '../types'
+import type { Sale, Product, Category, Page } from '../types'
 
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -13,6 +13,8 @@ function formatDate(date: string) {
 interface SaleItemForm {
   itemType: 'PRODUCT' | 'SERVICE'
   productId: string
+  categoryId: string
+  categorySearch: string
   description: string
   quantity: string
   unitPrice: string
@@ -21,9 +23,11 @@ interface SaleItemForm {
 function Vendas() {
   const [sales, setSales] = useState<Sale[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+  const [expandedSale, setExpandedSale] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
     customerName: '',
@@ -32,7 +36,7 @@ function Vendas() {
     discountPercentual: '',
   })
   const [items, setItems] = useState<SaleItemForm[]>([
-    { itemType: 'PRODUCT', productId: '', description: '', quantity: '1', unitPrice: '' }
+    { itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '' }
   ])
 
   function loadSales() {
@@ -48,22 +52,25 @@ function Vendas() {
   useEffect(() => { loadSales() }, [page])
 
   useEffect(() => {
-  api.get('/products?size=1000')
-    .then(res => {
-      const data = res.data
-      if (data.content) {
-        setProducts(data.content)
-      } else if (Array.isArray(data)) {
-        setProducts(data)
-      } else {
-        setProducts([])
-      }
-    })
-    .catch(() => setProducts([]))
-}, [])
+    api.get('/products?size=1000')
+      .then(res => {
+        const data = res.data
+        if (data.content) setProducts(data.content)
+        else if (Array.isArray(data)) setProducts(data)
+        else setProducts([])
+      })
+      .catch(() => setProducts([]))
+
+    api.get<Category[]>('/categories')
+      .then(res => setCategories(res.data))
+      .catch(() => setCategories([]))
+  }, [])
 
   function addItem() {
-    setItems(prev => [...prev, { itemType: 'PRODUCT', productId: '', description: '', quantity: '1', unitPrice: '' }])
+    setItems(prev => [...prev, {
+      itemType: 'PRODUCT', productId: '', categoryId: '',
+      categorySearch: '', description: '', quantity: '1', unitPrice: ''
+    }])
   }
 
   function removeItem(index: number) {
@@ -73,15 +80,7 @@ function Vendas() {
   function updateItem(index: number, field: keyof SaleItemForm, value: string) {
     setItems(prev => prev.map((item, i) => {
       if (i !== index) return item
-      const updated = { ...item, [field]: value }
-      if (field === 'productId' && value) {
-        const product = products.find(p => p.id === Number(value))
-        if (product) {
-          updated.description = product.name
-          updated.unitPrice = String(product.salePrice)
-        }
-      }
-      return updated
+      return { ...item, [field]: value }
     }))
   }
 
@@ -91,6 +90,14 @@ function Vendas() {
       productId: String(product.id),
       description: product.name,
       unitPrice: String(product.salePrice)
+    } : item))
+  }
+
+  function selectCategory(index: number, category: Category) {
+    setItems(prev => prev.map((item, i) => i === index ? {
+      ...item,
+      categoryId: String(category.id),
+      categorySearch: category.name
     } : item))
   }
 
@@ -116,6 +123,7 @@ function Vendas() {
       items: items.map(item => ({
         itemType: item.itemType,
         productId: item.itemType === 'PRODUCT' && item.productId ? Number(item.productId) : null,
+        categoryId: item.itemType === 'SERVICE' && item.categoryId ? Number(item.categoryId) : null,
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
@@ -124,7 +132,7 @@ function Vendas() {
     await api.post('/sales', body)
     setShowModal(false)
     setForm({ customerName: '', notes: '', discountValue: '', discountPercentual: '' })
-    setItems([{ itemType: 'PRODUCT', productId: '', description: '', quantity: '1', unitPrice: '' }])
+    setItems([{ itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '' }])
     loadSales()
   }
 
@@ -156,6 +164,7 @@ function Vendas() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-white/5">
+                  <th className="text-left px-4 py-3 text-white/30 font-normal w-6"></th>
                   <th className="text-left px-4 py-3 text-white/30 font-normal">Cliente</th>
                   <th className="text-left px-4 py-3 text-white/30 font-normal hidden md:table-cell">Data</th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal hidden md:table-cell">Subtotal</th>
@@ -166,24 +175,57 @@ function Vendas() {
               </thead>
               <tbody>
                 {sales.map(sale => (
-                  <tr key={sale.id} className="border-b border-white/5 hover:bg-white/2">
-                    <td className="px-4 py-3 text-white/80">{sale.customerName}</td>
-                    <td className="px-4 py-3 text-white/40 hidden md:table-cell">{formatDate(sale.saleDate)}</td>
-                    <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">{formatCurrency(sale.subtotal)}</td>
-                    <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">
-                      {sale.discountValue
-                        ? formatCurrency(sale.discountValue)
-                        : sale.discountPercentual
-                          ? `${sale.discountPercentual}%`
-                          : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-green-400 font-medium">{formatCurrency(sale.totalAmount)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleDelete(sale.id)} className="text-white/30 hover:text-red-400 text-xs transition-colors">
-                        Deletar
-                      </button>
-                    </td>
-                  </tr>
+                  <>
+                    <tr key={sale.id} className="border-b border-white/5 hover:bg-white/2 cursor-pointer"
+                      onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}>
+                      <td className="px-4 py-3 text-white/30 text-xs">
+                        {expandedSale === sale.id ? '▾' : '▸'}
+                      </td>
+                      <td className="px-4 py-3 text-white/80">{sale.customerName}</td>
+                      <td className="px-4 py-3 text-white/40 hidden md:table-cell">{formatDate(sale.saleDate)}</td>
+                      <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">{formatCurrency(sale.subtotal)}</td>
+                      <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">
+                        {sale.discountValue
+                          ? formatCurrency(sale.discountValue)
+                          : sale.discountPercentual
+                            ? `${sale.discountPercentual}%`
+                            : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-green-400 font-medium">{formatCurrency(sale.totalAmount)}</td>
+                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleDelete(sale.id)} className="text-white/30 hover:text-red-400 text-xs transition-colors">
+                          Deletar
+                        </button>
+                      </td>
+                    </tr>
+                    {expandedSale === sale.id && (
+                      <tr key={`${sale.id}-items`} className="border-b border-white/5 bg-white/2">
+                        <td colSpan={7} className="px-8 py-3">
+                          <div className="flex flex-col gap-1">
+                            <p className="text-white/20 text-xs mb-1">Itens da venda</p>
+                            {sale.items.map((item, idx) => (
+                              <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${item.itemType === 'PRODUCT' ? 'bg-blue-900/40 text-blue-400' : 'bg-purple-900/40 text-purple-400'}`}>
+                                    {item.itemType === 'PRODUCT' ? 'Produto' : 'Serviço'}
+                                  </span>
+                                  <span className="text-white/70 text-xs">{item.description}</span>
+                                  <span className="text-white/30 text-xs">× {item.quantity}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-white/40 text-xs">{formatCurrency(item.unitPrice)}/un</span>
+                                  <span className="text-white/70 text-xs font-medium">{formatCurrency(item.totalPrice)}</span>
+                                </div>
+                              </div>
+                            ))}
+                            {sale.notes && (
+                              <p className="text-white/30 text-xs mt-1 italic">Obs: {sale.notes}</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -217,90 +259,122 @@ function Vendas() {
                 <p className="text-white/40 text-xs">Itens</p>
 
                 <div className="grid grid-cols-12 gap-1 px-1">
-  <div className="col-span-2 text-white/20 text-xs">Tipo</div>
-  <div className="col-span-5 text-white/20 text-xs">Produto / Serviço</div>
-  <div className="col-span-2 text-white/20 text-xs text-center">Qtd</div>
-  <div className="col-span-2 text-white/20 text-xs">Preço unit.</div>
-  <div className="col-span-1"></div>
-</div>
+                  <div className="col-span-2 text-white/20 text-xs">Tipo</div>
+                  <div className="col-span-5 text-white/20 text-xs">Produto / Serviço</div>
+                  <div className="col-span-2 text-white/20 text-xs text-center">Qtd</div>
+                  <div className="col-span-2 text-white/20 text-xs">Preço unit.</div>
+                  <div className="col-span-1"></div>
+                </div>
 
                 {items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-1 items-center">
-  <div className="col-span-2">
-    <select value={item.itemType}
-      onChange={e => {
-        updateItem(index, 'itemType', e.target.value)
-        updateItem(index, 'productId', '')
-        updateItem(index, 'description', '')
-        updateItem(index, 'unitPrice', '')
-      }}
-      className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white/60 text-xs outline-none focus:border-[#2563eb]">
-      <option value="PRODUCT">Produto</option>
-      <option value="SERVICE">Serviço</option>
-    </select>
-  </div>
+                  <div key={index} className="grid grid-cols-12 gap-1 items-start">
+                    <div className="col-span-2">
+                      <select value={item.itemType}
+                        onChange={e => {
+                          setItems(prev => prev.map((it, i) => i === index ? {
+                            ...it,
+                            itemType: e.target.value as 'PRODUCT' | 'SERVICE',
+                            productId: '', categoryId: '', categorySearch: '',
+                            description: '', unitPrice: ''
+                          } : it))
+                        }}
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white/60 text-xs outline-none focus:border-[#2563eb]">
+                        <option value="PRODUCT">Produto</option>
+                        <option value="SERVICE">Serviço</option>
+                      </select>
+                    </div>
 
-  <div className="col-span-5 relative">
-    {item.itemType === 'PRODUCT' ? (
-      <>
-        <input
-          value={item.description}
-          onChange={e => {
-            updateItem(index, 'description', e.target.value)
-            updateItem(index, 'productId', '')
-          }}
-          placeholder="Buscar produto..."
-          className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
-        />
-        {item.description && !item.productId && (
-          <div className="absolute top-full left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg mt-0.5 z-20 max-h-36 overflow-y-auto shadow-lg">
-            {products
-              .filter(p => p.name.toLowerCase().includes(item.description.toLowerCase()))
-              .slice(0, 6)
-              .map(p => (
-                <button key={p.id} type="button"
-                  onClick={() => selectProduct(index, p)}
-                  className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
-                  <p className="text-white/80 text-xs">{p.name}</p>
-                  <p className="text-white/30 text-xs">{formatCurrency(p.salePrice)} · estoque: {p.stock}</p>
-                </button>
-              ))}
-            {products.filter(p => p.name.toLowerCase().includes(item.description.toLowerCase())).length === 0 && (
-              <p className="text-white/30 text-xs px-3 py-2">Nenhum produto encontrado</p>
-            )}
-          </div>
-        )}
-      </>
-    ) : (
-      <input
-        value={item.description}
-        onChange={e => updateItem(index, 'description', e.target.value)}
-        placeholder="Ex: Mão de obra Gol G5"
-        required
-        className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
-      />
-    )}
-  </div>
+                    <div className="col-span-5 relative flex flex-col gap-1">
+                      {item.itemType === 'PRODUCT' ? (
+                        <>
+                          <input
+                            value={item.description}
+                            onChange={e => {
+                              updateItem(index, 'description', e.target.value)
+                              updateItem(index, 'productId', '')
+                            }}
+                            placeholder="Buscar produto..."
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
+                          />
+                          {item.description && !item.productId && (
+                            <div className="absolute top-8 left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg z-20 max-h-36 overflow-y-auto shadow-lg">
+                              {products
+                                .filter(p => p.name.toLowerCase().includes(item.description.toLowerCase()))
+                                .slice(0, 6)
+                                .map(p => (
+                                  <button key={p.id} type="button"
+                                    onClick={() => selectProduct(index, p)}
+                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                                    <p className="text-white/80 text-xs">{p.name}</p>
+                                    <p className="text-white/30 text-xs">{formatCurrency(p.salePrice)} · estoque: {p.stock}</p>
+                                  </button>
+                                ))}
+                              {products.filter(p => p.name.toLowerCase().includes(item.description.toLowerCase())).length === 0 && (
+                                <p className="text-white/30 text-xs px-3 py-2">Nenhum produto encontrado</p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="relative">
+                            <input
+                              value={item.categorySearch}
+                              onChange={e => {
+                                updateItem(index, 'categorySearch', e.target.value)
+                                updateItem(index, 'categoryId', '')
+                              }}
+                              placeholder="Categoria (opcional)"
+                              className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
+                            />
+                            {item.categorySearch && !item.categoryId && (
+                              <div className="absolute top-full left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg mt-0.5 z-20 max-h-32 overflow-y-auto shadow-lg">
+                                {categories
+                                  .filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase()))
+                                  .slice(0, 5)
+                                  .map(c => (
+                                    <button key={c.id} type="button"
+                                      onClick={() => selectCategory(index, c)}
+                                      className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                                      <p className="text-white/80 text-xs">{c.name}</p>
+                                    </button>
+                                  ))}
+                                {categories.filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase())).length === 0 && (
+                                  <p className="text-white/30 text-xs px-3 py-2">Nenhuma categoria encontrada</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <input
+                            value={item.description}
+                            onChange={e => updateItem(index, 'description', e.target.value)}
+                            placeholder="Ex: Mão de obra Gol G5"
+                            required
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
+                          />
+                        </>
+                      )}
+                    </div>
 
-  <div className="col-span-2">
-    <input value={item.quantity} onChange={e => updateItem(index, 'quantity', e.target.value)}
-      type="number" min="1" required
-      className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white text-xs text-center outline-none focus:border-[#2563eb]" />
-  </div>
-  <div className="col-span-2">
-    <input value={item.unitPrice} onChange={e => updateItem(index, 'unitPrice', e.target.value)}
-      type="number" step="0.01" placeholder="0,00" required
-      className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]" />
-  </div>
-  <div className="col-span-1 flex justify-center">
-    {items.length > 1 && (
-      <button type="button" onClick={() => removeItem(index)}
-        className="text-white/20 hover:text-red-400 transition-colors text-base leading-none">
-        ×
-      </button>
-    )}
-  </div>
-</div>
+                    <div className="col-span-2">
+                      <input value={item.quantity} onChange={e => updateItem(index, 'quantity', e.target.value)}
+                        type="number" min="1" required
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white text-xs text-center outline-none focus:border-[#2563eb]" />
+                    </div>
+                    <div className="col-span-2">
+                      <input value={item.unitPrice} onChange={e => updateItem(index, 'unitPrice', e.target.value)}
+                        type="number" step="0.01" placeholder="0,00" required
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]" />
+                    </div>
+                    <div className="col-span-1 flex justify-center pt-1.5">
+                      {items.length > 1 && (
+                        <button type="button" onClick={() => removeItem(index)}
+                          className="text-white/20 hover:text-red-400 transition-colors text-base leading-none">
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ))}
 
                 <button type="button" onClick={addItem}
