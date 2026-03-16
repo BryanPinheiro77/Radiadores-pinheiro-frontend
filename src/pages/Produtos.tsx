@@ -10,26 +10,31 @@ function Produtos() {
   const [totalPages, setTotalPages] = useState(0)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [form, setForm] = useState({
     name: '', description: '', costPrice: '', salePrice: '',
     stock: '', minStock: '', categoryId: '', active: true
   })
+  const [categoryForm, setCategoryForm] = useState({ name: '', description: '' })
 
   function loadProducts() {
-  setLoading(true)
-  api.get<Product[]>('/products')
-    .then(res => {
-      setProducts(res.data)
-      setTotalPages(1)
-    })
-    .finally(() => setLoading(false))
-}
+    setLoading(true)
+    api.get<Product[]>('/products')
+      .then(res => {
+        setProducts(res.data)
+        setTotalPages(1)
+      })
+      .finally(() => setLoading(false))
+  }
+
+  function loadCategories() {
+    api.get<Category[]>('/categories').then(res => setCategories(res.data))
+  }
 
   useEffect(() => { loadProducts() }, [page, categoryFilter])
-  useEffect(() => {
-    api.get<Category[]>('/categories').then(res => setCategories(res.data))
-  }, [])
+  useEffect(() => { loadCategories() }, [])
 
   function openCreate() {
     setEditing(null)
@@ -38,15 +43,20 @@ function Produtos() {
   }
 
   function openEdit(p: Product) {
-    setEditing(p)
-    setForm({
-      name: p.name, description: p.description ?? '',
-      costPrice: String(p.costPrice), salePrice: String(p.salePrice),
-      stock: String(p.stock), minStock: String(p.minStock),
-      categoryId: '', active: p.active
-    })
-    setShowModal(true)
-  }
+  setEditing(p)
+  const matchedCategory = categories.find(c => c.name === p.categoryName)
+  setForm({
+    name: p.name,
+    description: p.description ?? '',
+    costPrice: String(p.costPrice),
+    salePrice: String(p.salePrice),
+    stock: String(p.stock),
+    minStock: String(p.minStock),
+    categoryId: matchedCategory ? String(matchedCategory.id) : '',
+    active: p.active
+  })
+  setShowModal(true)
+}
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -76,6 +86,24 @@ function Produtos() {
     loadProducts()
   }
 
+  async function handleCategorySubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (editingCategory) {
+      await api.put(`/categories/${editingCategory.id}`, categoryForm)
+    } else {
+      await api.post('/categories', categoryForm)
+    }
+    setCategoryForm({ name: '', description: '' })
+    setEditingCategory(null)
+    loadCategories()
+  }
+
+  async function handleDeleteCategory(id: number) {
+    if (!confirm('Deletar categoria?')) return
+    await api.delete(`/categories/${id}`)
+    loadCategories()
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -83,9 +111,16 @@ function Produtos() {
           <h1 className="text-white text-lg font-medium">Produtos</h1>
           <p className="text-white/30 text-sm mt-0.5">Gestão de estoque</p>
         </div>
-        <button onClick={openCreate} className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          + Novo produto
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowCategoryModal(true)}
+            className="border border-white/10 text-white/50 hover:text-white hover:bg-white/5 text-sm px-4 py-2 rounded-lg transition-colors">
+            Categorias
+          </button>
+          <button onClick={openCreate}
+            className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+            + Novo produto
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -163,22 +198,23 @@ function Produtos() {
         </div>
       )}
 
+      {/* Modal produto */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-md p-6">
             <h2 className="text-white font-medium mb-4">{editing ? 'Editar produto' : 'Novo produto'}</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
-              <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição" className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nome" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+              <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Descrição" className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
               <div className="grid grid-cols-2 gap-2">
-                <input value={form.costPrice} onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))} placeholder="Preço de custo" type="number" step="0.01" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
-                <input value={form.salePrice} onChange={e => setForm(f => ({ ...f, salePrice: e.target.value }))} placeholder="Preço de venda" type="number" step="0.01" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
+                <input value={form.costPrice} onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))} placeholder="Preço de custo" type="number" step="0.01" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+                <input value={form.salePrice} onChange={e => setForm(f => ({ ...f, salePrice: e.target.value }))} placeholder="Preço de venda" type="number" step="0.01" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} placeholder="Estoque" type="number" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
-                <input value={form.minStock} onChange={e => setForm(f => ({ ...f, minStock: e.target.value }))} placeholder="Estoque mínimo" type="number" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#4e90d9]" />
+                <input value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} placeholder="Estoque" type="number" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+                <input value={form.minStock} onChange={e => setForm(f => ({ ...f, minStock: e.target.value }))} placeholder="Estoque mínimo" type="number" required className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
               </div>
-              <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white/60 text-sm outline-none focus:border-[#4e90d9]">
+              <select value={form.categoryId} onChange={e => setForm(f => ({ ...f, categoryId: e.target.value }))} className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white/60 text-sm outline-none focus:border-[#2563eb]">
                 <option value="">Sem categoria</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -191,6 +227,62 @@ function Produtos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal categorias */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-medium">Categorias</h2>
+              <button onClick={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryForm({ name: '', description: '' }) }}
+                className="text-white/30 hover:text-white transition-colors text-xl leading-none">×</button>
+            </div>
+
+            <form onSubmit={handleCategorySubmit} className="flex flex-col gap-2 mb-4">
+              <input value={categoryForm.name}
+                onChange={e => setCategoryForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Nome da categoria" required
+                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+              <input value={categoryForm.description}
+                onChange={e => setCategoryForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Descrição (opcional)"
+                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+              <div className="flex gap-2">
+                {editingCategory && (
+                  <button type="button"
+                    onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }) }}
+                    className="flex-1 border border-white/10 text-white/40 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
+                    Cancelar
+                  </button>
+                )}
+                <button type="submit"
+                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors">
+                  {editingCategory ? 'Salvar' : '+ Adicionar'}
+                </button>
+              </div>
+            </form>
+
+            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+              {categories.length === 0 ? (
+                <p className="text-white/20 text-sm text-center py-4">Nenhuma categoria cadastrada</p>
+              ) : categories.map(c => (
+                <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-white/5">
+                  <div>
+                    <p className="text-white/80 text-sm">{c.name}</p>
+                    {c.description && <p className="text-white/30 text-xs">{c.description}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setEditingCategory(c); setCategoryForm({ name: c.name, description: c.description ?? '' }) }}
+                      className="text-white/30 hover:text-[#4e90d9] text-xs transition-colors">Editar</button>
+                    <button onClick={() => handleDeleteCategory(c.id)}
+                      className="text-white/30 hover:text-red-400 text-xs transition-colors">Deletar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
