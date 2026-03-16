@@ -18,6 +18,7 @@ interface SaleItemForm {
   description: string
   quantity: string
   unitPrice: string
+  serviceCost: string
 }
 
 function Vendas() {
@@ -29,15 +30,28 @@ function Vendas() {
   const [totalPages, setTotalPages] = useState(0)
   const [expandedSale, setExpandedSale] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
+
   const [form, setForm] = useState({
     customerName: '',
     notes: '',
     discountValue: '',
     discountPercentual: '',
   })
+
   const [items, setItems] = useState<SaleItemForm[]>([
-    { itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '' }
+    {
+      itemType: 'PRODUCT',
+      productId: '',
+      categoryId: '',
+      categorySearch: '',
+      description: '',
+      quantity: '1',
+      unitPrice: '',
+      serviceCost: ''
+    }
   ])
+
+  const hasServiceItem = items.some(item => item.itemType === 'SERVICE')
 
   function loadSales() {
     setLoading(true)
@@ -49,7 +63,9 @@ function Vendas() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { loadSales() }, [page])
+  useEffect(() => {
+    loadSales()
+  }, [page])
 
   useEffect(() => {
     api.get('/products?size=1000')
@@ -67,10 +83,19 @@ function Vendas() {
   }, [])
 
   function addItem() {
-    setItems(prev => [...prev, {
-      itemType: 'PRODUCT', productId: '', categoryId: '',
-      categorySearch: '', description: '', quantity: '1', unitPrice: ''
-    }])
+    setItems(prev => [
+      ...prev,
+      {
+        itemType: 'PRODUCT',
+        productId: '',
+        categoryId: '',
+        categorySearch: '',
+        description: '',
+        quantity: '1',
+        unitPrice: '',
+        serviceCost: ''
+      }
+    ])
   }
 
   function removeItem(index: number) {
@@ -78,27 +103,41 @@ function Vendas() {
   }
 
   function updateItem(index: number, field: keyof SaleItemForm, value: string) {
-    setItems(prev => prev.map((item, i) => {
-      if (i !== index) return item
-      return { ...item, [field]: value }
-    }))
+    setItems(prev =>
+      prev.map((item, i) => {
+        if (i !== index) return item
+        return { ...item, [field]: value }
+      })
+    )
   }
 
   function selectProduct(index: number, product: Product) {
-    setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      productId: String(product.id),
-      description: product.name,
-      unitPrice: String(product.salePrice)
-    } : item))
+    setItems(prev =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              productId: String(product.id),
+              description: product.name,
+              unitPrice: String(product.salePrice)
+            }
+          : item
+      )
+    )
   }
 
   function selectCategory(index: number, category: Category) {
-    setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      categoryId: String(category.id),
-      categorySearch: category.name
-    } : item))
+    setItems(prev =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              categoryId: String(category.id),
+              categorySearch: category.name
+            }
+          : item
+      )
+    )
   }
 
   const subtotal = items.reduce((acc, item) => {
@@ -115,6 +154,7 @@ function Vendas() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+
     const body = {
       customerName: form.customerName,
       notes: form.notes || null,
@@ -127,12 +167,31 @@ function Vendas() {
         description: item.description,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice),
+        serviceCost: item.itemType === 'SERVICE' && item.serviceCost ? Number(item.serviceCost) : null,
       }))
     }
+
     await api.post('/sales', body)
+
     setShowModal(false)
-    setForm({ customerName: '', notes: '', discountValue: '', discountPercentual: '' })
-    setItems([{ itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '' }])
+    setForm({
+      customerName: '',
+      notes: '',
+      discountValue: '',
+      discountPercentual: '',
+    })
+    setItems([
+      {
+        itemType: 'PRODUCT',
+        productId: '',
+        categoryId: '',
+        categorySearch: '',
+        description: '',
+        quantity: '1',
+        unitPrice: '',
+        serviceCost: ''
+      }
+    ])
     loadSales()
   }
 
@@ -149,16 +208,24 @@ function Vendas() {
           <h1 className="text-white text-lg font-medium">Vendas</h1>
           <p className="text-white/30 text-sm mt-0.5">Histórico e registro de vendas</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+
+        <button
+          onClick={() => setShowModal(true)}
+          className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
           + Nova venda
         </button>
       </div>
 
       <div className="bg-[#0d0f18] border border-white/10 rounded-xl overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-white/30 text-sm">Carregando...</div>
+          <div className="flex items-center justify-center h-32 text-white/30 text-sm">
+            Carregando...
+          </div>
         ) : sales.length === 0 ? (
-          <div className="flex items-center justify-center h-32 text-white/30 text-sm">Nenhuma venda encontrada</div>
+          <div className="flex items-center justify-center h-32 text-white/30 text-sm">
+            Nenhuma venda encontrada
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -173,59 +240,109 @@ function Vendas() {
                   <th className="text-right px-4 py-3 text-white/30 font-normal">Ações</th>
                 </tr>
               </thead>
+
               <tbody>
                 {sales.map(sale => (
-                  <>
-                    <tr key={sale.id} className="border-b border-white/5 hover:bg-white/2 cursor-pointer"
-                      onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}>
-                      <td className="px-4 py-3 text-white/30 text-xs">
-                        {expandedSale === sale.id ? '▾' : '▸'}
-                      </td>
-                      <td className="px-4 py-3 text-white/80">{sale.customerName}</td>
-                      <td className="px-4 py-3 text-white/40 hidden md:table-cell">{formatDate(sale.saleDate)}</td>
-                      <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">{formatCurrency(sale.subtotal)}</td>
-                      <td className="px-4 py-3 text-right text-white/40 hidden md:table-cell">
-                        {sale.discountValue
-                          ? formatCurrency(sale.discountValue)
-                          : sale.discountPercentual
-                            ? `${sale.discountPercentual}%`
-                            : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-green-400 font-medium">{formatCurrency(sale.totalAmount)}</td>
-                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => handleDelete(sale.id)} className="text-white/30 hover:text-red-400 text-xs transition-colors">
-                          Deletar
-                        </button>
-                      </td>
-                    </tr>
-                    {expandedSale === sale.id && (
-                      <tr key={`${sale.id}-items`} className="border-b border-white/5 bg-white/2">
-                        <td colSpan={7} className="px-8 py-3">
-                          <div className="flex flex-col gap-1">
-                            <p className="text-white/20 text-xs mb-1">Itens da venda</p>
-                            {sale.items.map((item, idx) => (
-                              <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xs px-1.5 py-0.5 rounded ${item.itemType === 'PRODUCT' ? 'bg-blue-900/40 text-blue-400' : 'bg-purple-900/40 text-purple-400'}`}>
-                                    {item.itemType === 'PRODUCT' ? 'Produto' : 'Serviço'}
-                                  </span>
-                                  <span className="text-white/70 text-xs">{item.description}</span>
-                                  <span className="text-white/30 text-xs">× {item.quantity}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-white/40 text-xs">{formatCurrency(item.unitPrice)}/un</span>
-                                  <span className="text-white/70 text-xs font-medium">{formatCurrency(item.totalPrice)}</span>
-                                </div>
-                              </div>
-                            ))}
-                            {sale.notes && (
-                              <p className="text-white/30 text-xs mt-1 italic">Obs: {sale.notes}</p>
-                            )}
+                  <tr key={sale.id}>
+                    <td colSpan={7} className="p-0">
+                      <>
+                        <div
+                          className="grid grid-cols-[24px_1fr_120px_120px_120px_120px_100px] items-center border-b border-white/5 hover:bg-white/2 cursor-pointer"
+                          onClick={() => setExpandedSale(expandedSale === sale.id ? null : sale.id)}
+                        >
+                          <div className="px-4 py-3 text-white/30 text-xs">
+                            {expandedSale === sale.id ? '▾' : '▸'}
                           </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
+
+                          <div className="px-4 py-3 text-white/80">{sale.customerName}</div>
+
+                          <div className="px-4 py-3 text-white/40 hidden md:block">
+                            {formatDate(sale.saleDate)}
+                          </div>
+
+                          <div className="px-4 py-3 text-right text-white/40 hidden md:block">
+                            {formatCurrency(sale.subtotal)}
+                          </div>
+
+                          <div className="px-4 py-3 text-right text-white/40 hidden md:block">
+                            {sale.discountValue
+                              ? formatCurrency(sale.discountValue)
+                              : sale.discountPercentual
+                                ? `${sale.discountPercentual}%`
+                                : '—'}
+                          </div>
+
+                          <div className="px-4 py-3 text-right text-green-400 font-medium">
+                            {formatCurrency(sale.totalAmount)}
+                          </div>
+
+                          <div
+                            className="px-4 py-3 text-right"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => handleDelete(sale.id)}
+                              className="text-white/30 hover:text-red-400 text-xs transition-colors"
+                            >
+                              Deletar
+                            </button>
+                          </div>
+                        </div>
+
+                        {expandedSale === sale.id && (
+                          <div className="border-b border-white/5 bg-white/2 px-8 py-3">
+                            <div className="flex flex-col gap-1">
+                              <p className="text-white/20 text-xs mb-1">Itens da venda</p>
+
+                              {sale.items.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex items-center justify-between py-1 border-b border-white/5 last:border-0"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`text-xs px-1.5 py-0.5 rounded ${
+                                        item.itemType === 'PRODUCT'
+                                          ? 'bg-blue-900/40 text-blue-400'
+                                          : 'bg-purple-900/40 text-purple-400'
+                                      }`}
+                                    >
+                                      {item.itemType === 'PRODUCT' ? 'Produto' : 'Serviço'}
+                                    </span>
+
+                                    <span className="text-white/70 text-xs">{item.description}</span>
+                                    <span className="text-white/30 text-xs">× {item.quantity}</span>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    {item.itemType === 'SERVICE' && item.serviceCost != null && (
+                                      <span className="text-white/30 text-xs">
+                                        custo: {formatCurrency(item.serviceCost)}
+                                      </span>
+                                    )}
+
+                                    <span className="text-white/40 text-xs">
+                                      {formatCurrency(item.unitPrice)}/un
+                                    </span>
+
+                                    <span className="text-white/70 text-xs font-medium">
+                                      {formatCurrency(item.totalPrice)}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+
+                              {sale.notes && (
+                                <p className="text-white/30 text-xs mt-1 italic">
+                                  Obs: {sale.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -235,11 +352,23 @@ function Vendas() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
+          >
             ← Anterior
           </button>
-          <span className="text-white/30 text-sm">{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">
+
+          <span className="text-white/30 text-sm">
+            {page + 1} / {totalPages}
+          </span>
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+            className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
+          >
             Próximo →
           </button>
         </div>
@@ -249,36 +378,64 @@ function Vendas() {
         <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
           <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-2xl p-6 my-4">
             <h2 className="text-white font-medium mb-4">Nova venda</h2>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-              <input value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
-                placeholder="Nome do cliente" required
-                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <input
+                value={form.customerName}
+                onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
+                placeholder="Nome do cliente"
+                required
+                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+              />
 
               <div className="flex flex-col gap-2">
                 <p className="text-white/40 text-xs">Itens</p>
 
                 <div className="grid grid-cols-12 gap-1 px-1">
                   <div className="col-span-2 text-white/20 text-xs">Tipo</div>
-                  <div className="col-span-5 text-white/20 text-xs">Produto / Serviço</div>
-                  <div className="col-span-2 text-white/20 text-xs text-center">Qtd</div>
-                  <div className="col-span-2 text-white/20 text-xs">Preço unit.</div>
+
+                  <div className={hasServiceItem ? 'col-span-5 text-white/20 text-xs' : 'col-span-5 text-white/20 text-xs'}>
+                    Produto / Serviço
+                  </div>
+
+                  <div className="col-span-1 text-white/20 text-xs text-center">Qtd</div>
+
+                  {hasServiceItem && (
+                    <div className="col-span-2 text-white/20 text-xs">Custo</div>
+                  )}
+
+                  <div className={hasServiceItem ? 'col-span-1 text-white/20 text-xs' : 'col-span-3 text-white/20 text-xs'}>
+                    Preço
+                  </div>
+
                   <div className="col-span-1"></div>
                 </div>
 
                 {items.map((item, index) => (
                   <div key={index} className="grid grid-cols-12 gap-1 items-start">
                     <div className="col-span-2">
-                      <select value={item.itemType}
+                      <select
+                        value={item.itemType}
                         onChange={e => {
-                          setItems(prev => prev.map((it, i) => i === index ? {
-                            ...it,
-                            itemType: e.target.value as 'PRODUCT' | 'SERVICE',
-                            productId: '', categoryId: '', categorySearch: '',
-                            description: '', unitPrice: ''
-                          } : it))
+                          setItems(prev =>
+                            prev.map((it, i) =>
+                              i === index
+                                ? {
+                                    ...it,
+                                    itemType: e.target.value as 'PRODUCT' | 'SERVICE',
+                                    productId: '',
+                                    categoryId: '',
+                                    categorySearch: '',
+                                    description: '',
+                                    unitPrice: '',
+                                    serviceCost: ''
+                                  }
+                                : it
+                            )
+                          )
                         }}
-                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white/60 text-xs outline-none focus:border-[#2563eb]">
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white/60 text-xs outline-none focus:border-[#2563eb]"
+                      >
                         <option value="PRODUCT">Produto</option>
                         <option value="SERVICE">Serviço</option>
                       </select>
@@ -296,21 +453,34 @@ function Vendas() {
                             placeholder="Buscar produto..."
                             className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
                           />
+
                           {item.description && !item.productId && (
                             <div className="absolute top-8 left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg z-20 max-h-36 overflow-y-auto shadow-lg">
                               {products
-                                .filter(p => p.name.toLowerCase().includes(item.description.toLowerCase()))
+                                .filter(p =>
+                                  p.name.toLowerCase().includes(item.description.toLowerCase())
+                                )
                                 .slice(0, 6)
                                 .map(p => (
-                                  <button key={p.id} type="button"
+                                  <button
+                                    key={p.id}
+                                    type="button"
                                     onClick={() => selectProduct(index, p)}
-                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                  >
                                     <p className="text-white/80 text-xs">{p.name}</p>
-                                    <p className="text-white/30 text-xs">{formatCurrency(p.salePrice)} · estoque: {p.stock}</p>
+                                    <p className="text-white/30 text-xs">
+                                      {formatCurrency(p.salePrice)} · estoque: {p.stock}
+                                    </p>
                                   </button>
                                 ))}
-                              {products.filter(p => p.name.toLowerCase().includes(item.description.toLowerCase())).length === 0 && (
-                                <p className="text-white/30 text-xs px-3 py-2">Nenhum produto encontrado</p>
+
+                              {products.filter(p =>
+                                p.name.toLowerCase().includes(item.description.toLowerCase())
+                              ).length === 0 && (
+                                <p className="text-white/30 text-xs px-3 py-2">
+                                  Nenhum produto encontrado
+                                </p>
                               )}
                             </div>
                           )}
@@ -327,24 +497,36 @@ function Vendas() {
                               placeholder="Categoria (opcional)"
                               className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
                             />
+
                             {item.categorySearch && !item.categoryId && (
                               <div className="absolute top-full left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg mt-0.5 z-20 max-h-32 overflow-y-auto shadow-lg">
                                 {categories
-                                  .filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase()))
+                                  .filter(c =>
+                                    c.name.toLowerCase().includes(item.categorySearch.toLowerCase())
+                                  )
                                   .slice(0, 5)
                                   .map(c => (
-                                    <button key={c.id} type="button"
+                                    <button
+                                      key={c.id}
+                                      type="button"
                                       onClick={() => selectCategory(index, c)}
-                                      className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0">
+                                      className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                    >
                                       <p className="text-white/80 text-xs">{c.name}</p>
                                     </button>
                                   ))}
-                                {categories.filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase())).length === 0 && (
-                                  <p className="text-white/30 text-xs px-3 py-2">Nenhuma categoria encontrada</p>
+
+                                {categories.filter(c =>
+                                  c.name.toLowerCase().includes(item.categorySearch.toLowerCase())
+                                ).length === 0 && (
+                                  <p className="text-white/30 text-xs px-3 py-2">
+                                    Nenhuma categoria encontrada
+                                  </p>
                                 )}
                               </div>
                             )}
                           </div>
+
                           <input
                             value={item.description}
                             onChange={e => updateItem(index, 'description', e.target.value)}
@@ -356,20 +538,49 @@ function Vendas() {
                       )}
                     </div>
 
-                    <div className="col-span-2">
-                      <input value={item.quantity} onChange={e => updateItem(index, 'quantity', e.target.value)}
-                        type="number" min="1" required
-                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white text-xs text-center outline-none focus:border-[#2563eb]" />
+                    <div className="col-span-1">
+                      <input
+                        value={item.quantity}
+                        onChange={e => updateItem(index, 'quantity', e.target.value)}
+                        type="number"
+                        min="1"
+                        required
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-1 py-1.5 text-white text-xs text-center outline-none focus:border-[#2563eb]"
+                      />
                     </div>
-                    <div className="col-span-2">
-                      <input value={item.unitPrice} onChange={e => updateItem(index, 'unitPrice', e.target.value)}
-                        type="number" step="0.01" placeholder="0,00" required
-                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]" />
+
+                    {item.itemType === 'SERVICE' && (
+                      <div className="col-span-2">
+                        <input
+                          value={item.serviceCost}
+                          onChange={e => updateItem(index, 'serviceCost', e.target.value)}
+                          type="number"
+                          step="0.01"
+                          placeholder="Custo"
+                          className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
+                        />
+                      </div>
+                    )}
+
+                    <div className={item.itemType === 'SERVICE' ? 'col-span-1' : 'col-span-3'}>
+                      <input
+                        value={item.unitPrice}
+                        onChange={e => updateItem(index, 'unitPrice', e.target.value)}
+                        type="number"
+                        step="0.01"
+                        placeholder="Preço"
+                        required
+                        className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-1.5 text-white text-xs outline-none focus:border-[#2563eb]"
+                      />
                     </div>
+
                     <div className="col-span-1 flex justify-center pt-1.5">
                       {items.length > 1 && (
-                        <button type="button" onClick={() => removeItem(index)}
-                          className="text-white/20 hover:text-red-400 transition-colors text-base leading-none">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="text-white/20 hover:text-red-400 transition-colors text-base leading-none"
+                        >
                           ×
                         </button>
                       )}
@@ -377,8 +588,11 @@ function Vendas() {
                   </div>
                 ))}
 
-                <button type="button" onClick={addItem}
-                  className="border border-dashed border-white/10 text-white/30 hover:text-white/50 hover:border-white/20 text-sm py-2 rounded-lg transition-colors">
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="border border-dashed border-white/10 text-white/30 hover:text-white/50 hover:border-white/20 text-sm py-2 rounded-lg transition-colors"
+                >
                   + Adicionar item
                 </button>
               </div>
@@ -386,33 +600,61 @@ function Vendas() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-white/40 text-xs">Desconto em R$</label>
-                  <input value={form.discountValue} onChange={e => setForm(f => ({ ...f, discountValue: e.target.value, discountPercentual: '' }))}
-                    placeholder="0,00" type="number" step="0.01"
-                    className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+                  <input
+                    value={form.discountValue}
+                    onChange={e =>
+                      setForm(f => ({
+                        ...f,
+                        discountValue: e.target.value,
+                        discountPercentual: ''
+                      }))
+                    }
+                    placeholder="0,00"
+                    type="number"
+                    step="0.01"
+                    className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                  />
                 </div>
+
                 <div className="flex flex-col gap-1">
                   <label className="text-white/40 text-xs">Desconto em %</label>
-                  <input value={form.discountPercentual} onChange={e => setForm(f => ({ ...f, discountPercentual: e.target.value, discountValue: '' }))}
-                    placeholder="0" type="number" step="0.1"
-                    className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+                  <input
+                    value={form.discountPercentual}
+                    onChange={e =>
+                      setForm(f => ({
+                        ...f,
+                        discountPercentual: e.target.value,
+                        discountValue: ''
+                      }))
+                    }
+                    placeholder="0"
+                    type="number"
+                    step="0.1"
+                    className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                  />
                 </div>
               </div>
 
-              <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              <input
+                value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Observações (opcional)"
-                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
+                className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+              />
 
               <div className="bg-[#0a0c14] rounded-lg p-3 flex flex-col gap-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-white/40">Subtotal</span>
                   <span className="text-white/60">{formatCurrency(subtotal)}</span>
                 </div>
+
                 {discount > 0 && (
                   <div className="flex justify-between text-xs">
                     <span className="text-white/40">Desconto</span>
                     <span className="text-red-400">- {formatCurrency(discount)}</span>
                   </div>
                 )}
+
                 <div className="flex justify-between text-sm font-medium border-t border-white/5 pt-1 mt-1">
                   <span className="text-white/60">Total</span>
                   <span className="text-white">{formatCurrency(total)}</span>
@@ -420,12 +662,18 @@ function Vendas() {
               </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowModal(false)}
-                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors"
+                >
                   Cancelar
                 </button>
-                <button type="submit"
-                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors">
+
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors"
+                >
                   Registrar venda
                 </button>
               </div>

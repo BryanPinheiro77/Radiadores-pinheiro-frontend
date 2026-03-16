@@ -27,8 +27,15 @@ function getLastSixMonths() {
   return months
 }
 
+interface TotalBalance {
+  totalRevenue: number
+  totalExpenses: number
+  balance: number
+}
+
 export default function Dashboard() {
   const [report, setReport] = useState<ReportResponse | null>(null)
+  const [totalBalance, setTotalBalance] = useState<TotalBalance | null>(null)
   const [chartData, setChartData] = useState<{ mes: string, faturamento: number, despesas: number }[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,13 +45,15 @@ export default function Dashboard() {
   const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
 
   useEffect(() => {
-    // Carrega relatório do mês atual
     api.get<ReportResponse>(`/api/reports?start=${start}&end=${end}`)
       .then(res => setReport(res.data))
       .catch(() => setError('Erro ao carregar relatório'))
       .finally(() => setLoading(false))
 
-    // Carrega dados dos últimos 6 meses para o gráfico
+    api.get<TotalBalance>('/api/reports/balance')
+      .then(res => setTotalBalance(res.data))
+      .catch(() => {})
+
     const months = getLastSixMonths()
     Promise.all(
       months.map(m =>
@@ -80,7 +89,7 @@ export default function Dashboard() {
         <p className="text-white/30 text-sm mt-0.5">Mês atual</p>
       </div>
 
-      {/* Cards de métricas */}
+      {/* Cards de métricas do mês */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
           <p className="text-white/40 text-xs mb-1">Faturamento</p>
@@ -100,18 +109,37 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Card saldo do mês */}
-      <div className={`border rounded-xl p-4 flex items-center justify-between ${saldo >= 0 ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
-        <div>
-          <p className="text-white/40 text-xs mb-1">Saldo do mês</p>
-          <p className={`text-2xl font-medium ${saldo >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {formatCurrency(saldo)}
-          </p>
-          <p className="text-white/20 text-xs mt-0.5">Faturamento − Despesas</p>
+      {/* Cards de saldo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Saldo do mês */}
+        <div className={`border rounded-xl p-4 flex items-center justify-between ${saldo >= 0 ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
+          <div>
+            <p className="text-white/40 text-xs mb-1">Saldo do mês</p>
+            <p className={`text-2xl font-medium ${saldo >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {formatCurrency(saldo)}
+            </p>
+            <p className="text-white/20 text-xs mt-0.5">Faturamento − Despesas</p>
+          </div>
+          <div className={`text-4xl ${saldo >= 0 ? 'text-green-400/20' : 'text-red-400/20'}`}>
+            {saldo >= 0 ? '↑' : '↓'}
+          </div>
         </div>
-        <div className={`text-4xl ${saldo >= 0 ? 'text-green-400/20' : 'text-red-400/20'}`}>
-          {saldo >= 0 ? '↑' : '↓'}
-        </div>
+
+        {/* Saldo total acumulado */}
+        {totalBalance && (
+          <div className={`border rounded-xl p-4 flex items-center justify-between ${totalBalance.balance >= 0 ? 'bg-blue-900/10 border-blue-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
+            <div>
+              <p className="text-white/40 text-xs mb-1">Caixa total acumulado</p>
+              <p className={`text-2xl font-medium ${totalBalance.balance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                {formatCurrency(totalBalance.balance)}
+              </p>
+              <p className="text-white/20 text-xs mt-0.5">Todo o histórico</p>
+            </div>
+            <div className={`text-4xl ${totalBalance.balance >= 0 ? 'text-blue-400/20' : 'text-red-400/20'}`}>
+              {totalBalance.balance >= 0 ? '↑' : '↓'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gráfico de barras */}
@@ -137,9 +165,7 @@ export default function Dashboard() {
               labelStyle={{ color: '#ffffff60', fontSize: 12 }}
               formatter={(value) => formatCurrency(Number(value))}
             />
-            <Legend
-              wrapperStyle={{ color: '#ffffff60', fontSize: 12, paddingTop: 8 }}
-            />
+            <Legend wrapperStyle={{ color: '#ffffff60', fontSize: 12, paddingTop: 8 }} />
             <Bar dataKey="faturamento" name="Faturamento" fill="#22c55e" radius={[4, 4, 0, 0]} />
             <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
           </BarChart>

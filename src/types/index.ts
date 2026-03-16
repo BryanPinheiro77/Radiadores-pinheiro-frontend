@@ -32,6 +32,8 @@ export interface SaleItem {
   quantity: number
   unitPrice: number
   totalPrice: number
+  categoryName?: string | null
+  serviceCost?: number | null
 }
 
 export interface Sale {
