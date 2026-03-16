@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
-import type { Product, Category, Page } from '../types'
+import type { Product, Category } from '../types'
 
 function Produtos() {
   const [products, setProducts] = useState<Product[]>([])
