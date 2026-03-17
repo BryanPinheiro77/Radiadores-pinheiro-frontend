@@ -14,6 +14,8 @@ function Produtos() {
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [submittingCategory, setSubmittingCategory] = useState(false)
   const [form, setForm] = useState({
     name: '', description: '', costPrice: '', salePrice: '',
     stock: '', minStock: '', categoryId: '', active: true
@@ -23,10 +25,7 @@ function Produtos() {
   function loadProducts() {
     setLoading(true)
     api.get<Product[]>('/products')
-      .then(res => {
-        setProducts(res.data)
-        setTotalPages(1)
-      })
+      .then(res => { setProducts(res.data); setTotalPages(1) })
       .finally(() => setLoading(false))
   }
 
@@ -47,12 +46,9 @@ function Produtos() {
     setEditing(p)
     const matchedCategory = categories.find(c => c.name === p.categoryName)
     setForm({
-      name: p.name,
-      description: p.description ?? '',
-      costPrice: String(p.costPrice),
-      salePrice: String(p.salePrice),
-      stock: String(p.stock),
-      minStock: String(p.minStock),
+      name: p.name, description: p.description ?? '',
+      costPrice: String(p.costPrice), salePrice: String(p.salePrice),
+      stock: String(p.stock), minStock: String(p.minStock),
       categoryId: matchedCategory ? String(matchedCategory.id) : '',
       active: p.active
     })
@@ -61,19 +57,22 @@ function Produtos() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
     const body = {
       name: form.name, description: form.description,
       costPrice: Number(form.costPrice), salePrice: Number(form.salePrice),
       stock: Number(form.stock), minStock: Number(form.minStock),
       categoryId: form.categoryId ? Number(form.categoryId) : null
     }
-    if (editing) {
-      await api.put(`/products/${editing.id}`, body)
-    } else {
-      await api.post('/products', body)
+    try {
+      if (editing) await api.put(`/products/${editing.id}`, body)
+      else await api.post('/products', body)
+      setShowModal(false)
+      loadProducts()
+    } finally {
+      setSubmitting(false)
     }
-    setShowModal(false)
-    loadProducts()
   }
 
   async function handleToggle(id: number) {
@@ -89,14 +88,17 @@ function Produtos() {
 
   async function handleCategorySubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (editingCategory) {
-      await api.put(`/categories/${editingCategory.id}`, categoryForm)
-    } else {
-      await api.post('/categories', categoryForm)
+    if (submittingCategory) return
+    setSubmittingCategory(true)
+    try {
+      if (editingCategory) await api.put(`/categories/${editingCategory.id}`, categoryForm)
+      else await api.post('/categories', categoryForm)
+      setCategoryForm({ name: '', description: '' })
+      setEditingCategory(null)
+      loadCategories()
+    } finally {
+      setSubmittingCategory(false)
     }
-    setCategoryForm({ name: '', description: '' })
-    setEditingCategory(null)
-    loadCategories()
   }
 
   async function handleDeleteCategory(id: number) {
@@ -105,7 +107,6 @@ function Produtos() {
     loadCategories()
   }
 
-  // Filtragem local por nome e categoria
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter
@@ -133,19 +134,12 @@ function Produtos() {
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+        <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nome..."
-          className="bg-[#0d0f18] border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#2563eb] flex-1 min-w-[160px]"
-        />
-        <select
-          value={categoryFilter}
-          onChange={e => { setCategoryFilter(e.target.value); setPage(0) }}
-          className="bg-[#0d0f18] border border-white/10 text-white/60 text-sm rounded-lg px-3 py-2 outline-none"
-        >
+          className="bg-[#0d0f18] border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#2563eb] flex-1 min-w-[160px]" />
+        <select value={categoryFilter} onChange={e => { setCategoryFilter(e.target.value); setPage(0) }}
+          className="bg-[#0d0f18] border border-white/10 text-white/60 text-sm rounded-lg px-3 py-2 outline-none">
           <option value="">Todas as categorias</option>
           {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -175,9 +169,7 @@ function Produtos() {
                   <tr key={p.id} className="border-b border-white/5 hover:bg-white/2">
                     <td className="px-4 py-3">
                       <p className="text-white/80">{p.name}</p>
-                      {p.description && (
-                        <p className="text-white/30 text-xs mt-0.5 truncate max-w-[200px]">{p.description}</p>
-                      )}
+                      {p.description && <p className="text-white/30 text-xs mt-0.5 truncate max-w-[200px]">{p.description}</p>}
                     </td>
                     <td className="px-4 py-3 text-white/40 hidden lg:table-cell">{p.categoryName ?? '—'}</td>
                     <td className="px-4 py-3 text-right text-white/50 hidden md:table-cell">
@@ -210,17 +202,12 @@ function Produtos() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">
-            ← Anterior
-          </button>
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">← Anterior</button>
           <span className="text-white/30 text-sm">{page + 1} / {totalPages}</span>
-          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">
-            Próximo →
-          </button>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1} className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1">Próximo →</button>
         </div>
       )}
 
-      {/* Modal produto */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-md p-6">
@@ -244,8 +231,9 @@ function Produtos() {
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
                   Cancelar
                 </button>
-                <button type="submit" className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors">
-                  {editing ? 'Salvar' : 'Criar'}
+                <button type="submit" disabled={submitting}
+                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm py-2 rounded-lg transition-colors">
+                  {submitting ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}
                 </button>
               </div>
             </form>
@@ -253,7 +241,6 @@ function Produtos() {
         </div>
       )}
 
-      {/* Modal categorias */}
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-md p-6">
@@ -263,25 +250,22 @@ function Produtos() {
                 className="text-white/30 hover:text-white transition-colors text-xl leading-none">×</button>
             </div>
             <form onSubmit={handleCategorySubmit} className="flex flex-col gap-2 mb-4">
-              <input value={categoryForm.name}
-                onChange={e => setCategoryForm(f => ({ ...f, name: e.target.value }))}
+              <input value={categoryForm.name} onChange={e => setCategoryForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Nome da categoria" required
                 className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
-              <input value={categoryForm.description}
-                onChange={e => setCategoryForm(f => ({ ...f, description: e.target.value }))}
+              <input value={categoryForm.description} onChange={e => setCategoryForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="Descrição (opcional)"
                 className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
               <div className="flex gap-2">
                 {editingCategory && (
-                  <button type="button"
-                    onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }) }}
+                  <button type="button" onClick={() => { setEditingCategory(null); setCategoryForm({ name: '', description: '' }) }}
                     className="flex-1 border border-white/10 text-white/40 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
                     Cancelar
                   </button>
                 )}
-                <button type="submit"
-                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors">
-                  {editingCategory ? 'Salvar' : '+ Adicionar'}
+                <button type="submit" disabled={submittingCategory}
+                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm py-2 rounded-lg transition-colors">
+                  {submittingCategory ? 'Salvando...' : editingCategory ? 'Salvar' : '+ Adicionar'}
                 </button>
               </div>
             </form>
