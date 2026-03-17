@@ -30,6 +30,7 @@ function Vendas() {
   const [totalPages, setTotalPages] = useState(0)
   const [expandedSale, setExpandedSale] = useState<number | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
     customerName: '',
     notes: '',
@@ -116,6 +117,8 @@ function Vendas() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
     const body = {
       customerName: form.customerName,
       notes: form.notes || null,
@@ -131,11 +134,15 @@ function Vendas() {
         serviceCost: item.itemType === 'SERVICE' && item.serviceCost ? Number(item.serviceCost) : null,
       }))
     }
-    await api.post('/sales', body)
-    setShowModal(false)
-    setForm({ customerName: '', notes: '', discountValue: '', discountPercentual: '' })
-    setItems([{ itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '', serviceCost: '' }])
-    loadSales()
+    try {
+      await api.post('/sales', body)
+      setShowModal(false)
+      setForm({ customerName: '', notes: '', discountValue: '', discountPercentual: '' })
+      setItems([{ itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '', serviceCost: '' }])
+      loadSales()
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   async function handleDelete(id: number) {
@@ -257,7 +264,6 @@ function Vendas() {
                       </div>
                     </div>
                   </div>
-
                   {expandedSale === sale.id && (
                     <div className="px-4 pb-3 bg-white/2">
                       <p className="text-white/20 text-xs mb-2">Itens da venda</p>
@@ -304,17 +310,14 @@ function Vendas() {
           <div className="bg-[#0d0f18] border border-white/10 rounded-xl w-full max-w-3xl p-4 md:p-6 my-4">
             <h2 className="text-white font-medium mb-4">Nova venda</h2>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-
               <input value={form.customerName} onChange={e => setForm(f => ({ ...f, customerName: e.target.value }))}
                 placeholder="Nome do cliente" required
                 className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
 
               <div className="flex flex-col gap-2">
                 <p className="text-white/40 text-xs">Itens</p>
-
                 {items.map((item, index) => (
                   <div key={index} className="border border-white/10 rounded-xl p-3 flex flex-col gap-3">
-
                     <div className="flex gap-2">
                       <div className="flex flex-col gap-1 w-32">
                         <label className="text-white/30 text-xs">Tipo</label>
@@ -331,7 +334,6 @@ function Vendas() {
                           <option value="SERVICE">Serviço</option>
                         </select>
                       </div>
-
                       <div className="flex-1 flex flex-col gap-1 relative">
                         <label className="text-white/30 text-xs">
                           {item.itemType === 'PRODUCT' ? 'Produto' : 'Categoria'}
@@ -398,7 +400,6 @@ function Vendas() {
                           type="number" min="1" required
                           className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm text-center outline-none focus:border-[#2563eb]" />
                       </div>
-
                       {item.itemType === 'SERVICE' && (
                         <div className="flex flex-col gap-1">
                           <label className="text-white/30 text-xs">Custo (opc.)</label>
@@ -407,7 +408,6 @@ function Vendas() {
                             className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
                         </div>
                       )}
-
                       <div className="flex flex-col gap-1">
                         <label className="text-white/30 text-xs">Preço unit.</label>
                         <input value={item.unitPrice} onChange={e => updateItem(index, 'unitPrice', e.target.value)}
@@ -426,7 +426,6 @@ function Vendas() {
                     )}
                   </div>
                 ))}
-
                 <button type="button" onClick={addItem}
                   className="border border-dashed border-white/10 text-white/30 hover:text-white/50 hover:border-white/20 text-sm py-2 rounded-lg transition-colors">
                   + Adicionar item
@@ -474,9 +473,9 @@ function Vendas() {
                   className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
                   Cancelar
                 </button>
-                <button type="submit"
-                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm py-2 rounded-lg transition-colors">
-                  Registrar venda
+                <button type="submit" disabled={submitting}
+                  className="flex-1 bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm py-2 rounded-lg transition-colors">
+                  {submitting ? 'Registrando...' : 'Registrar venda'}
                 </button>
               </div>
             </form>
