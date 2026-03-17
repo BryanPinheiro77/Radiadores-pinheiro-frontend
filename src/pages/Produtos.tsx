@@ -69,8 +69,9 @@ function Produtos() {
       if (editing) await api.put(`/products/${editing.id}`, body)
       else await api.post('/products', body)
       setShowModal(false)
+      setSubmitting(false)
       loadProducts()
-    } finally {
+    } catch {
       setSubmitting(false)
     }
   }
@@ -95,8 +96,9 @@ function Produtos() {
       else await api.post('/categories', categoryForm)
       setCategoryForm({ name: '', description: '' })
       setEditingCategory(null)
+      setSubmittingCategory(false)
       loadCategories()
-    } finally {
+    } catch {
       setSubmittingCategory(false)
     }
   }
@@ -228,7 +230,8 @@ function Produtos() {
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <div className="flex gap-2 mt-2">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
+                <button type="button" onClick={() => !submitting && setShowModal(false)} disabled={submitting}
+                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50">
                   Cancelar
                 </button>
                 <button type="submit" disabled={submitting}

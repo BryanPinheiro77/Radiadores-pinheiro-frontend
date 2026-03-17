@@ -69,19 +69,13 @@ export default function Reposicao() {
     api.get<RestockSuggestion[]>(url)
       .then(res => {
         const newItems = res.data.map(s => ({
-          productId: s.productId,
-          productName: s.productName,
-          categoryName: s.categoryName,
-          currentStock: s.currentStock,
-          minStock: s.minStock,
-          suggestedQuantity: s.suggestedQuantity,
-          orderedQuantity: String(s.suggestedQuantity),
-          selected: true
+          productId: s.productId, productName: s.productName, categoryName: s.categoryName,
+          currentStock: s.currentStock, minStock: s.minStock, suggestedQuantity: s.suggestedQuantity,
+          orderedQuantity: String(s.suggestedQuantity), selected: true
         }))
         setOrderItems(prev => {
           const existingIds = prev.map(p => p.productId)
-          const toAdd = newItems.filter(n => !existingIds.includes(n.productId))
-          return [...prev, ...toAdd]
+          return [...prev, ...newItems.filter(n => !existingIds.includes(n.productId))]
         })
       })
       .finally(() => setLoading(false))
@@ -89,23 +83,15 @@ export default function Reposicao() {
 
   function addProductManually(product: Product) {
     if (orderItems.find(i => i.productId === product.id)) {
-      setProductSearch('')
-      setShowProductSearch(false)
-      return
+      setProductSearch(''); setShowProductSearch(false); return
     }
-    const calculatedQuantity = Math.max(1, product.minStock - product.stock)
     setOrderItems(prev => [...prev, {
-      productId: product.id,
-      productName: product.name,
-      categoryName: product.categoryName,
-      currentStock: product.stock,
-      minStock: product.minStock,
+      productId: product.id, productName: product.name, categoryName: product.categoryName,
+      currentStock: product.stock, minStock: product.minStock,
       suggestedQuantity: Math.max(0, product.minStock - product.stock),
-      orderedQuantity: String(calculatedQuantity),
-      selected: true
+      orderedQuantity: String(Math.max(1, product.minStock - product.stock)), selected: true
     }])
-    setProductSearch('')
-    setShowProductSearch(false)
+    setProductSearch(''); setShowProductSearch(false)
   }
 
   function removeItem(productId: number) {
@@ -146,18 +132,18 @@ export default function Reposicao() {
     const body = {
       notes: notes || null,
       items: selectedItems.map(s => ({
-        productId: s.productId,
-        suggestedQuantity: s.suggestedQuantity,
+        productId: s.productId, suggestedQuantity: s.suggestedQuantity,
         orderedQuantity: Number(s.orderedQuantity)
       }))
     }
     try {
       const res = await api.post<RestockOrder>('/restock/orders', body)
+      setSubmitting(false)
       setOrderItems([])
       setNotes('')
       loadOrders()
       downloadPdf(res.data.id)
-    } finally {
+    } catch {
       setSubmitting(false)
     }
   }
@@ -189,7 +175,6 @@ export default function Reposicao() {
 
       <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-5 flex flex-col gap-4">
         <h2 className="text-white/60 text-sm font-medium">Montar pedido</h2>
-
         <div className="flex gap-2 flex-wrap items-end">
           <div className="flex flex-col gap-1">
             <label className="text-white/30 text-xs">Filtrar sugestões por categoria</label>
@@ -277,7 +262,6 @@ export default function Reposicao() {
                 </tbody>
               </table>
             </div>
-
             <div className="flex flex-col md:flex-row md:items-center gap-3 pt-2 border-t border-white/5">
               <input value={notes} onChange={e => setNotes(e.target.value)}
                 placeholder="Observações (opcional)"
