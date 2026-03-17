@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../api/axios'
 import type { ReportResponse } from '../types'
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend
-} from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -38,6 +36,7 @@ export default function Dashboard() {
   const [totalBalance, setTotalBalance] = useState<TotalBalance | null>(null)
   const [chartData, setChartData] = useState<{ mes: string, faturamento: number, despesas: number }[]>([])
   const [loading, setLoading] = useState(true)
+  const [chartLoading, setChartLoading] = useState(true)
   const [error, setError] = useState('')
 
   const today = new Date()
@@ -45,15 +44,19 @@ export default function Dashboard() {
   const end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]
 
   useEffect(() => {
-    api.get<ReportResponse>(`/api/reports?start=${start}&end=${end}`)
-      .then(res => setReport(res.data))
+    // Carrega relatório do mês e saldo em paralelo — aparecem rápido
+    Promise.all([
+      api.get<ReportResponse>(`/api/reports?start=${start}&end=${end}`),
+      api.get<TotalBalance>('/api/reports/balance')
+    ])
+      .then(([reportRes, balanceRes]) => {
+        setReport(reportRes.data)
+        setTotalBalance(balanceRes.data)
+      })
       .catch(() => setError('Erro ao carregar relatório'))
       .finally(() => setLoading(false))
 
-    api.get<TotalBalance>('/api/reports/balance')
-      .then(res => setTotalBalance(res.data))
-      .catch(() => {})
-
+    // Carrega gráfico em background — não bloqueia a tela
     const months = getLastSixMonths()
     Promise.all(
       months.map(m =>
@@ -65,7 +68,9 @@ export default function Dashboard() {
           }))
           .catch(() => ({ mes: m.label, faturamento: 0, despesas: 0 }))
       )
-    ).then(data => setChartData(data))
+    )
+      .then(data => setChartData(data))
+      .finally(() => setChartLoading(false))
   }, [])
 
   const saldo = (report?.totalRevenue ?? 0) - (report?.totalExpenses ?? 0)
@@ -89,7 +94,6 @@ export default function Dashboard() {
         <p className="text-white/30 text-sm mt-0.5">Mês atual</p>
       </div>
 
-      {/* Cards de métricas do mês */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
           <p className="text-white/40 text-xs mb-1">Faturamento</p>
@@ -109,9 +113,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Cards de saldo */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* Saldo do mês */}
         <div className={`border rounded-xl p-4 flex items-center justify-between ${saldo >= 0 ? 'bg-green-900/10 border-green-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
           <div>
             <p className="text-white/40 text-xs mb-1">Saldo do mês</p>
@@ -125,7 +127,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Saldo total acumulado */}
         {totalBalance && (
           <div className={`border rounded-xl p-4 flex items-center justify-between ${totalBalance.balance >= 0 ? 'bg-blue-900/10 border-blue-900/30' : 'bg-red-900/10 border-red-900/30'}`}>
             <div>
@@ -142,38 +143,32 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Gráfico de barras */}
+      {/* Gráfico carrega em background sem bloquear a tela */}
       <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
         <h2 className="text-white/60 text-sm font-medium mb-4">Faturamento vs Despesas — últimos 6 meses</h2>
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-            <XAxis
-              dataKey="mes"
-              tick={{ fill: '#ffffff40', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: '#ffffff40', fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`}
-              width={48}
-            />
-            <Tooltip
-              contentStyle={{ background: '#13151f', border: '1px solid #ffffff15', borderRadius: 8 }}
-              labelStyle={{ color: '#ffffff60', fontSize: 12 }}
-              formatter={(value) => formatCurrency(Number(value))}
-            />
-            <Legend wrapperStyle={{ color: '#ffffff60', fontSize: 12, paddingTop: 8 }} />
-            <Bar dataKey="faturamento" name="Faturamento" fill="#22c55e" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+        {chartLoading ? (
+          <div className="flex items-center justify-center h-[220px] text-white/20 text-sm">
+            Carregando gráfico...
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData} barGap={4} barCategoryGap="30%">
+              <XAxis dataKey="mes" tick={{ fill: '#ffffff40', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#ffffff40', fontSize: 11 }} axisLine={false} tickLine={false}
+                tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={48} />
+              <Tooltip
+                contentStyle={{ background: '#13151f', border: '1px solid #ffffff15', borderRadius: 8 }}
+                labelStyle={{ color: '#ffffff60', fontSize: 12 }}
+                formatter={(value) => formatCurrency(Number(value))} />
+              <Legend wrapperStyle={{ color: '#ffffff60', fontSize: 12, paddingTop: 8 }} />
+              <Bar dataKey="faturamento" name="Faturamento" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Produtos mais vendidos */}
         <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
           <h2 className="text-white/60 text-sm font-medium mb-3">Mais vendidos</h2>
           {report?.bestSellingProducts.length === 0 ? (
@@ -190,7 +185,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Estoque crítico */}
         <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
           <h2 className="text-white/60 text-sm font-medium mb-3">Estoque crítico</h2>
           {report?.productsBelowMinStock.length === 0 ? (
@@ -210,7 +204,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Produtos mais lucrativos */}
       <div className="bg-[#0d0f18] border border-white/10 rounded-xl p-4">
         <h2 className="text-white/60 text-sm font-medium mb-3">Mais lucrativos</h2>
         {report?.mostProfitableProducts.length === 0 ? (
