@@ -93,4 +93,15 @@ src/
 |----------|-----------|
 | `VITE_API_URL` | URL base da API backend |
 
-## Licença
+---
+
+## 👥 Time
+
+- **Bryan Pinheiro** — [@BryanPinheiro77](https://github.com/BryanPinheiro77)
+- **Luiz Fernando** — [@LuizFernandoReisFranca](https://github.com/luizfernandoreisfranca)
+
+---
+
+## ⚖️ Licença
+
+Este projeto está licenciado sob a [MIT License](LICENSE).
