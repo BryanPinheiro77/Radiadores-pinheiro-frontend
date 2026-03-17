@@ -31,6 +31,7 @@ export default function Despesas() {
   const [filterCategory, setFilterCategory] = useState('')
   const [filterStart, setFilterStart] = useState('')
   const [filterEnd, setFilterEnd] = useState('')
+  const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editing, setEditing] = useState<Expense | null>(null)
@@ -130,7 +131,11 @@ export default function Despesas() {
     fetchCategories()
   }
 
-  const total = expenses.reduce((sum, e) => sum + e.value, 0)
+  const filteredExpenses = expenses.filter(e =>
+    e.description.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const total = filteredExpenses.reduce((sum, e) => sum + e.value, 0)
 
   function getTypeLabel(expense: Expense) {
     if (expense.expenseType === 'INSTALLMENT' && expense.totalInstallments && expense.currentInstallment) {
@@ -183,6 +188,15 @@ export default function Despesas() {
           className="bg-[#0d0f18] border border-white/10 text-white/60 hover:text-white text-sm px-4 py-2 rounded-lg transition-colors">
           Filtrar
         </button>
+        <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
+          <label className="text-white/30 text-xs">Buscar</label>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por descrição..."
+            className="w-full bg-[#0d0f18] border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#2563eb]"
+          />
+        </div>
       </div>
 
       {/* Card total */}
@@ -195,7 +209,7 @@ export default function Despesas() {
       <div className="bg-[#0d0f18] border border-white/10 rounded-xl overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-32 text-white/30 text-sm">Carregando...</div>
-        ) : expenses.length === 0 ? (
+        ) : filteredExpenses.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-white/30 text-sm">Nenhuma despesa encontrada</div>
         ) : (
           <div className="overflow-x-auto">
@@ -210,7 +224,7 @@ export default function Despesas() {
                 </tr>
               </thead>
               <tbody>
-                {expenses.map(e => (
+                {filteredExpenses.map(e => (
                   <tr key={e.id} className="border-b border-white/5 hover:bg-white/2">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -267,7 +281,6 @@ export default function Despesas() {
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
 
-              {/* Tipo da despesa */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-white/30 text-xs">Tipo</label>
                 <div className="flex bg-[#0a0c14] rounded-lg p-1 gap-1 border border-white/10">
