@@ -32,10 +32,7 @@ function Vendas() {
   const [showModal, setShowModal] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({
-    customerName: '',
-    notes: '',
-    discountValue: '',
-    discountPercentual: '',
+    customerName: '', notes: '', discountValue: '', discountPercentual: '',
   })
   const [items, setItems] = useState<SaleItemForm[]>([
     { itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '', serviceCost: '' }
@@ -44,10 +41,7 @@ function Vendas() {
   function loadSales() {
     setLoading(true)
     api.get<Page<Sale>>('/sales?size=50&sort=saleDate,desc')
-      .then(res => {
-        setSales(res.data.content)
-        setTotalPages(res.data.totalPages)
-      })
+      .then(res => { setSales(res.data.content); setTotalPages(res.data.totalPages) })
       .finally(() => setLoading(false))
   }
 
@@ -62,10 +56,7 @@ function Vendas() {
         else setProducts([])
       })
       .catch(() => setProducts([]))
-
-    api.get<Category[]>('/categories')
-      .then(res => setCategories(res.data))
-      .catch(() => setCategories([]))
+    api.get<Category[]>('/categories').then(res => setCategories(res.data)).catch(() => setCategories([]))
   }, [])
 
   function addItem() {
@@ -80,38 +71,27 @@ function Vendas() {
   }
 
   function updateItem(index: number, field: keyof SaleItemForm, value: string) {
-    setItems(prev => prev.map((item, i) => {
-      if (i !== index) return item
-      return { ...item, [field]: value }
-    }))
+    setItems(prev => prev.map((item, i) => i !== index ? item : { ...item, [field]: value }))
   }
 
   function selectProduct(index: number, product: Product) {
     setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      productId: String(product.id),
-      description: product.name,
-      unitPrice: String(product.salePrice)
+      ...item, productId: String(product.id), description: product.name, unitPrice: String(product.salePrice)
     } : item))
   }
 
   function selectCategory(index: number, category: Category) {
     setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      categoryId: String(category.id),
-      categorySearch: category.name
+      ...item, categoryId: String(category.id), categorySearch: category.name
     } : item))
   }
 
-  const subtotal = items.reduce((acc, item) => {
-    return acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)
-  }, 0)
+  const subtotal = items.reduce((acc, item) =>
+    acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0)
 
   const discount = form.discountValue
     ? Number(form.discountValue)
-    : form.discountPercentual
-      ? subtotal * (Number(form.discountPercentual) / 100)
-      : 0
+    : form.discountPercentual ? subtotal * (Number(form.discountPercentual) / 100) : 0
 
   const total = subtotal - discount
 
@@ -137,10 +117,11 @@ function Vendas() {
     try {
       await api.post('/sales', body)
       setShowModal(false)
+      setSubmitting(false)
       setForm({ customerName: '', notes: '', discountValue: '', discountPercentual: '' })
       setItems([{ itemType: 'PRODUCT', productId: '', categoryId: '', categorySearch: '', description: '', quantity: '1', unitPrice: '', serviceCost: '' }])
       loadSales()
-    } finally {
+    } catch {
       setSubmitting(false)
     }
   }
@@ -170,7 +151,6 @@ function Vendas() {
           <div className="flex items-center justify-center h-32 text-white/30 text-sm">Nenhuma venda encontrada</div>
         ) : (
           <>
-            {/* Tabela — desktop */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -236,7 +216,6 @@ function Vendas() {
               </table>
             </div>
 
-            {/* Cards — mobile */}
             <div className="md:hidden flex flex-col divide-y divide-white/5">
               {sales.map(sale => (
                 <div key={sale.id}>
@@ -257,9 +236,7 @@ function Vendas() {
                       </div>
                       <div className="flex items-center gap-3">
                         <button onClick={e => { e.stopPropagation(); handleDelete(sale.id) }}
-                          className="text-white/20 hover:text-red-400 text-xs transition-colors">
-                          Deletar
-                        </button>
+                          className="text-white/20 hover:text-red-400 text-xs transition-colors">Deletar</button>
                         <span className="text-white/30 text-xs">{expandedSale === sale.id ? '▾' : '▸'}</span>
                       </div>
                     </div>
@@ -335,9 +312,7 @@ function Vendas() {
                         </select>
                       </div>
                       <div className="flex-1 flex flex-col gap-1 relative">
-                        <label className="text-white/30 text-xs">
-                          {item.itemType === 'PRODUCT' ? 'Produto' : 'Categoria'}
-                        </label>
+                        <label className="text-white/30 text-xs">{item.itemType === 'PRODUCT' ? 'Produto' : 'Categoria'}</label>
                         {item.itemType === 'PRODUCT' ? (
                           <>
                             <input value={item.description}
@@ -386,8 +361,7 @@ function Vendas() {
                     {item.itemType === 'SERVICE' && (
                       <div className="flex flex-col gap-1">
                         <label className="text-white/30 text-xs">Descrição</label>
-                        <input value={item.description}
-                          onChange={e => updateItem(index, 'description', e.target.value)}
+                        <input value={item.description} onChange={e => updateItem(index, 'description', e.target.value)}
                           placeholder="Ex: Mão de obra Gol G5" required
                           className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
                       </div>
@@ -419,9 +393,7 @@ function Vendas() {
                     {items.length > 1 && (
                       <div className="flex justify-end">
                         <button type="button" onClick={() => removeItem(index)}
-                          className="text-white/20 hover:text-red-400 transition-colors text-xs">
-                          Remover item
-                        </button>
+                          className="text-white/20 hover:text-red-400 transition-colors text-xs">Remover item</button>
                       </div>
                     )}
                   </div>
@@ -469,8 +441,9 @@ function Vendas() {
               </div>
 
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShowModal(false)}
-                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
+                <button type="button" onClick={() => !submitting && setShowModal(false)}
+                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+                  disabled={submitting}>
                   Cancelar
                 </button>
                 <button type="submit" disabled={submitting}

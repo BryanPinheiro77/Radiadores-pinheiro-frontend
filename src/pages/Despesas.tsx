@@ -44,10 +44,7 @@ export default function Despesas() {
   })
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' })
 
-  useEffect(() => {
-    fetchCategories()
-    fetchExpenses()
-  }, [])
+  useEffect(() => { fetchCategories(); fetchExpenses() }, [])
 
   function fetchExpenses() {
     setLoading(true)
@@ -57,14 +54,11 @@ export default function Despesas() {
     if (filterEnd) params.push(`end=${filterEnd}`)
     if (filterCategory) params.push(`categoryId=${filterCategory}`)
     if (params.length > 0) url += '/filter?' + params.join('&')
-    api.get<Expense[]>(url)
-      .then(res => setExpenses(res.data))
-      .finally(() => setLoading(false))
+    api.get<Expense[]>(url).then(res => setExpenses(res.data)).finally(() => setLoading(false))
   }
 
   function fetchCategories() {
-    api.get<ExpenseCategory[]>('/api/expense-categories')
-      .then(res => setCategories(res.data))
+    api.get<ExpenseCategory[]>('/api/expense-categories').then(res => setCategories(res.data))
   }
 
   function openCreate() {
@@ -76,11 +70,8 @@ export default function Despesas() {
   function openEdit(e: Expense) {
     setEditing(e)
     setForm({
-      description: e.description,
-      value: String(e.value),
-      date: e.date,
-      categoryId: String(e.categoryId),
-      notes: e.notes ?? '',
+      description: e.description, value: String(e.value), date: e.date,
+      categoryId: String(e.categoryId), notes: e.notes ?? '',
       expenseType: e.expenseType ?? 'SINGLE',
       totalInstallments: e.totalInstallments ? String(e.totalInstallments) : ''
     })
@@ -92,12 +83,9 @@ export default function Despesas() {
     if (submitting) return
     setSubmitting(true)
     const body = {
-      description: form.description,
-      value: parseFloat(form.value),
-      date: form.date,
+      description: form.description, value: parseFloat(form.value), date: form.date,
       categoryId: form.categoryId ? parseInt(form.categoryId) : null,
-      notes: form.notes || null,
-      expenseType: form.expenseType,
+      notes: form.notes || null, expenseType: form.expenseType,
       totalInstallments: form.expenseType === 'INSTALLMENT' && form.totalInstallments
         ? parseInt(form.totalInstallments) : null
     }
@@ -105,8 +93,9 @@ export default function Despesas() {
       if (editing) await api.put(`/api/expenses/${editing.id}`, body)
       else await api.post('/api/expenses', body)
       setShowModal(false)
+      setSubmitting(false)
       fetchExpenses()
-    } finally {
+    } catch {
       setSubmitting(false)
     }
   }
@@ -126,8 +115,9 @@ export default function Despesas() {
       else await api.post('/api/expense-categories', categoryForm)
       setCategoryForm({ name: '', description: '' })
       setEditingCategory(null)
+      setSubmittingCategory(false)
       fetchCategories()
-    } finally {
+    } catch {
       setSubmittingCategory(false)
     }
   }
@@ -141,13 +131,11 @@ export default function Despesas() {
   const filteredExpenses = expenses.filter(e =>
     e.description.toLowerCase().includes(search.toLowerCase())
   )
-
   const total = filteredExpenses.reduce((sum, e) => sum + e.value, 0)
 
   function getTypeLabel(expense: Expense) {
-    if (expense.expenseType === 'INSTALLMENT' && expense.totalInstallments && expense.currentInstallment) {
+    if (expense.expenseType === 'INSTALLMENT' && expense.totalInstallments && expense.currentInstallment)
       return `${expense.currentInstallment}/${expense.totalInstallments}`
-    }
     if (expense.expenseType === 'RECURRING') return '↻'
     return null
   }
@@ -231,9 +219,7 @@ export default function Despesas() {
                       <div className="flex items-center gap-2">
                         <span className="text-white/80">{e.description}</span>
                         {getTypeLabel(e) && (
-                          <span className="text-white/30 text-xs bg-white/5 px-1.5 py-0.5 rounded">
-                            {getTypeLabel(e)}
-                          </span>
+                          <span className="text-white/30 text-xs bg-white/5 px-1.5 py-0.5 rounded">{getTypeLabel(e)}</span>
                         )}
                       </div>
                     </td>
@@ -316,8 +302,8 @@ export default function Despesas() {
                 placeholder="Observações (opcional)"
                 className="bg-[#0a0c14] border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]" />
               <div className="flex gap-2 mt-1">
-                <button type="button" onClick={() => setShowModal(false)}
-                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors">
+                <button type="button" onClick={() => !submitting && setShowModal(false)} disabled={submitting}
+                  className="flex-1 border border-white/10 text-white/50 text-sm py-2 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50">
                   Cancelar
                 </button>
                 <button type="submit" disabled={submitting}
