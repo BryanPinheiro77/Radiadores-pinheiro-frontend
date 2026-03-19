@@ -272,9 +272,19 @@ function Produtos() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full table-fixed text-sm">
+              <colgroup>
+                <col className="w-[32%]" />
+                <col className="w-[18%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+              </colgroup>
+
               <thead>
-                <tr className="border-b border-white/5">
+                <tr className="border-b border-white/5 align-top">
                   <th className="text-left px-4 py-3 text-white/30 font-normal">Nome</th>
                   <th className="text-left px-4 py-3 text-white/30 font-normal hidden lg:table-cell">Categoria</th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal hidden md:table-cell">Custo</th>
@@ -287,28 +297,33 @@ function Produtos() {
 
               <tbody>
                 {paginatedProducts.map(product => (
-                  <tr key={product.id} className="border-b border-white/5 hover:bg-white/2">
+                  <tr key={product.id} className="border-b border-white/5 hover:bg-white/2 align-top">
                     <td className="px-4 py-3">
-                      <p className="text-white/80">{product.name}</p>
-                      {product.description && (
-                        <p className="text-white/30 text-xs mt-0.5 truncate max-w-[200px]">
-                          {product.description}
+                      <div className="flex flex-col">
+                        <p className="text-white/80 text-sm leading-5 break-words whitespace-normal">
+                          {product.name}
                         </p>
-                      )}
+
+                        {product.description ? (
+                          <p className="text-white/30 text-xs leading-4 mt-0.5 break-words whitespace-normal">
+                            {product.description}
+                          </p>
+                        ) : null}
+                      </div>
                     </td>
 
-                    <td className="px-4 py-3 text-white/40 hidden lg:table-cell">
+                    <td className="px-4 py-3 text-white/40 text-sm leading-5 hidden lg:table-cell break-words whitespace-normal">
                       {product.categoryName ?? '—'}
                     </td>
 
-                    <td className="px-4 py-3 text-right text-white/50 hidden md:table-cell">
+                    <td className="px-4 py-3 text-right text-white/50 text-sm leading-5 hidden md:table-cell whitespace-nowrap">
                       {product.costPrice.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL'
                       })}
                     </td>
 
-                    <td className="px-4 py-3 text-right text-white/70">
+                    <td className="px-4 py-3 text-right text-white/70 text-sm leading-5 whitespace-nowrap">
                       {product.salePrice.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL'
@@ -316,14 +331,14 @@ function Produtos() {
                     </td>
 
                     <td
-                      className={`px-4 py-3 text-right font-medium ${
+                      className={`px-4 py-3 text-right text-sm leading-5 font-medium whitespace-nowrap ${
                         product.stock <= product.minStock ? 'text-red-400' : 'text-white/70'
                       }`}
                     >
                       {product.stock}
                     </td>
 
-                    <td className="px-4 py-3 text-center hidden md:table-cell">
+                    <td className="px-4 py-3 text-center hidden md:table-cell whitespace-nowrap">
                       <button
                         onClick={() => handleToggle(product.id)}
                         className={`text-xs px-2 py-0.5 rounded-md ${
@@ -336,7 +351,7 @@ function Produtos() {
                       </button>
                     </td>
 
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => openEdit(product)}
