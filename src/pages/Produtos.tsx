@@ -272,7 +272,7 @@ function Produtos() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-sm">
+            <table className="min-w-[900px] w-full table-fixed text-sm">
               <colgroup>
                 <col className="w-[32%]" />
                 <col className="w-[18%]" />
@@ -286,18 +286,27 @@ function Produtos() {
               <thead>
                 <tr className="border-b border-white/5 align-top">
                   <th className="text-left px-4 py-3 text-white/30 font-normal">Nome</th>
-                  <th className="text-left px-4 py-3 text-white/30 font-normal hidden lg:table-cell">Categoria</th>
-                  <th className="text-right px-4 py-3 text-white/30 font-normal hidden md:table-cell">Custo</th>
+                  <th className="text-left px-4 py-3 text-white/30 font-normal hidden lg:table-cell">
+                    Categoria
+                  </th>
+                  <th className="text-right px-4 py-3 text-white/30 font-normal hidden md:table-cell">
+                    Custo
+                  </th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal">Venda</th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal">Estoque</th>
-                  <th className="text-center px-4 py-3 text-white/30 font-normal hidden md:table-cell">Status</th>
+                  <th className="text-center px-4 py-3 text-white/30 font-normal hidden md:table-cell">
+                    Status
+                  </th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal">Ações</th>
                 </tr>
               </thead>
 
               <tbody>
                 {paginatedProducts.map(product => (
-                  <tr key={product.id} className="border-b border-white/5 hover:bg-white/2 align-top">
+                  <tr
+                    key={product.id}
+                    className="border-b border-white/5 hover:bg-white/2 align-top"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <p className="text-white/80 text-sm leading-5 break-words whitespace-normal">
