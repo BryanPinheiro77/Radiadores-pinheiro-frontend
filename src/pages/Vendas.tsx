@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import api from '../api/axios'
 import type { Sale, Product, Category, Page } from '../types'
 
@@ -10,6 +10,28 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString('pt-BR')
 }
 
+function normalizeText(value: string | null | undefined) {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function isServiceProduct(product: Product) {
+  const name = normalizeText(product.name)
+  const category = normalizeText(product.categoryName)
+
+  return (
+    category.includes('mao de obra') ||
+    category.includes('servico') ||
+    category.includes('service') ||
+    name.includes('mao de obra') ||
+    name.includes('servico') ||
+    name.includes('service')
+  )
+}
+
 interface SaleItemForm {
   itemType: 'PRODUCT' | 'SERVICE'
   productId: string
@@ -19,6 +41,7 @@ interface SaleItemForm {
   quantity: string
   unitPrice: string
   serviceCost: string
+  linkedServiceProductId?: string
 }
 
 function Vendas() {
@@ -26,6 +49,7 @@ function Vendas() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingProducts, setLoadingProducts] = useState(true)
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   const [expandedSale, setExpandedSale] = useState<number | null>(null)
@@ -48,9 +72,45 @@ function Vendas() {
       description: '',
       quantity: '1',
       unitPrice: '',
-      serviceCost: ''
+      serviceCost: '',
+      linkedServiceProductId: ''
     }
   ])
+
+  async function loadAllProducts() {
+    setLoadingProducts(true)
+
+    try {
+      const pageSize = 50
+      let currentPage = 0
+      let totalPagesLocal = 1
+      const all: Product[] = []
+
+      while (currentPage < totalPagesLocal) {
+        const res = await api.get<Page<Product>>(
+          `/products?page=${currentPage}&size=${pageSize}&sort=name,asc`
+        )
+
+        all.push(...res.data.content)
+        totalPagesLocal = res.data.totalPages
+        currentPage++
+      }
+
+      const unique = Array.from(
+        new Map(all.map(product => [product.id, product])).values()
+      )
+
+      unique.sort((a, b) =>
+        a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+      )
+
+      setProducts(unique)
+    } catch {
+      setProducts([])
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
 
   function loadSales() {
     setLoading(true)
@@ -67,15 +127,22 @@ function Vendas() {
   }, [page])
 
   useEffect(() => {
-
-    api.get<Page<Product>>('/products?page=0&size=50&sort=id,desc')
-      .then(res => setProducts(res.data.content))
-      .catch(() => setProducts([]))
+    loadAllProducts()
 
     api.get<Category[]>('/categories')
       .then(res => setCategories(res.data))
       .catch(() => setCategories([]))
   }, [])
+
+  const serviceProducts = useMemo(
+    () => products.filter(p => p.active && isServiceProduct(p)),
+    [products]
+  )
+
+  const regularProducts = useMemo(
+    () => products.filter(p => p.active && !isServiceProduct(p)),
+    [products]
+  )
 
   function addItem() {
     setItems(prev => [
@@ -88,7 +155,8 @@ function Vendas() {
         description: '',
         quantity: '1',
         unitPrice: '',
-        serviceCost: ''
+        serviceCost: '',
+        linkedServiceProductId: ''
       }
     ])
   }
@@ -98,28 +166,70 @@ function Vendas() {
   }
 
   function updateItem(index: number, field: keyof SaleItemForm, value: string) {
-    setItems(prev => prev.map((item, i) => i !== index ? item : { ...item, [field]: value }))
+    setItems(prev =>
+      prev.map((item, i) => (i !== index ? item : { ...item, [field]: value }))
+    )
   }
 
   function selectProduct(index: number, product: Product) {
-    setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      productId: String(product.id),
-      description: product.name,
-      unitPrice: String(product.salePrice)
-    } : item))
+    setItems(prev =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              productId: String(product.id),
+              description: product.name,
+              unitPrice: String(product.salePrice),
+              linkedServiceProductId: '',
+              categoryId: '',
+              categorySearch: ''
+            }
+          : item
+      )
+    )
   }
 
   function selectCategory(index: number, category: Category) {
-    setItems(prev => prev.map((item, i) => i === index ? {
-      ...item,
-      categoryId: String(category.id),
-      categorySearch: category.name
-    } : item))
+    setItems(prev =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              categoryId: String(category.id),
+              categorySearch: category.name
+            }
+          : item
+      )
+    )
   }
 
-  const subtotal = items.reduce((acc, item) =>
-    acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0)
+  function selectServiceProduct(index: number, product: Product) {
+    const matchedCategory = categories.find(
+      c => normalizeText(c.name) === normalizeText(product.categoryName)
+    )
+
+    setItems(prev =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              description: product.name,
+              unitPrice: String(product.salePrice),
+              serviceCost: String(product.costPrice ?? 0),
+              categoryId: matchedCategory ? String(matchedCategory.id) : '',
+              categorySearch: matchedCategory?.name ?? product.categoryName ?? '',
+              linkedServiceProductId: String(product.id),
+              productId: ''
+            }
+          : item
+      )
+    )
+  }
+
+  const subtotal = items.reduce(
+    (acc, item) => acc + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0
+  )
 
   const discount = form.discountValue
     ? Number(form.discountValue)
@@ -169,7 +279,8 @@ function Vendas() {
           description: '',
           quantity: '1',
           unitPrice: '',
-          serviceCost: ''
+          serviceCost: '',
+          linkedServiceProductId: ''
         }
       ])
       loadSales()
@@ -343,177 +454,213 @@ function Vendas() {
               <div className="flex flex-col gap-2">
                 <p className="text-white/40 text-xs">Itens</p>
 
-                {items.map((item, index) => (
-                  <div key={index} className="border border-white/10 rounded-xl p-3 flex flex-col gap-3">
-                    <div className="flex gap-2">
-                      <div className="flex flex-col gap-1 w-32">
-                        <label className="text-white/30 text-xs">Tipo</label>
-                        <select
-                          value={item.itemType}
-                          onChange={e => {
-                            setItems(prev => prev.map((it, i) => i === index ? {
-                              ...it,
-                              itemType: e.target.value as 'PRODUCT' | 'SERVICE',
-                              productId: '',
-                              categoryId: '',
-                              categorySearch: '',
-                              description: '',
-                              unitPrice: '',
-                              serviceCost: ''
-                            } : it))
-                          }}
-                          className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
-                        >
-                          <option value="PRODUCT">Produto</option>
-                          <option value="SERVICE">Serviço</option>
-                        </select>
-                      </div>
+                {items.map((item, index) => {
+                  const productSuggestions = regularProducts
+                    .filter(p => normalizeText(p.name).includes(normalizeText(item.description)))
+                    .slice(0, 8)
 
-                      <div className="flex-1 flex flex-col gap-1 relative">
-                        <label className="text-white/30 text-xs">{item.itemType === 'PRODUCT' ? 'Produto' : 'Categoria'}</label>
+                  const serviceSuggestions = serviceProducts
+                    .filter(p => normalizeText(p.name).includes(normalizeText(item.description)))
+                    .slice(0, 8)
 
-                        {item.itemType === 'PRODUCT' ? (
-                          <>
-                            <input
-                              value={item.description}
-                              onChange={e => {
-                                updateItem(index, 'description', e.target.value)
+                  const categorySuggestions = categories
+                    .filter(c => normalizeText(c.name).includes(normalizeText(item.categorySearch)))
+                    .slice(0, 6)
+
+                  return (
+                    <div key={index} className="border border-white/10 rounded-xl p-3 flex flex-col gap-3">
+                      <div className="flex gap-2 flex-col md:flex-row">
+                        <div className="flex flex-col gap-1 w-full md:w-32">
+                          <label className="text-white/30 text-xs">Tipo</label>
+                          <select
+                            value={item.itemType}
+                            onChange={e => {
+                              setItems(prev =>
+                                prev.map((it, i) =>
+                                  i === index
+                                    ? {
+                                        ...it,
+                                        itemType: e.target.value as 'PRODUCT' | 'SERVICE',
+                                        productId: '',
+                                        categoryId: '',
+                                        categorySearch: '',
+                                        description: '',
+                                        unitPrice: '',
+                                        serviceCost: '',
+                                        linkedServiceProductId: ''
+                                      }
+                                    : it
+                                )
+                              )
+                            }}
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-2 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                          >
+                            <option value="PRODUCT">Produto</option>
+                            <option value="SERVICE">Serviço</option>
+                          </select>
+                        </div>
+
+                        <div className="flex-1 flex flex-col gap-1 relative">
+                          <label className="text-white/30 text-xs">
+                            {item.itemType === 'PRODUCT' ? 'Produto' : 'Descrição do serviço'}
+                          </label>
+
+                          <input
+                            value={item.description}
+                            onChange={e => {
+                              updateItem(index, 'description', e.target.value)
+
+                              if (item.itemType === 'PRODUCT') {
                                 updateItem(index, 'productId', '')
-                              }}
-                              placeholder="Buscar produto..."
-                              className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
-                            />
+                              } else {
+                                updateItem(index, 'linkedServiceProductId', '')
+                              }
+                            }}
+                            placeholder={item.itemType === 'PRODUCT' ? 'Buscar produto...' : 'Digite ou busque um serviço cadastrado...'}
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                          />
 
-                            {item.description && !item.productId && (
-                              <div className="absolute top-[60px] left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg z-20 max-h-36 overflow-y-auto shadow-lg">
-                                {products
-                                  .filter(p => p.name.toLowerCase().includes(item.description.toLowerCase()))
-                                  .slice(0, 6)
-                                  .map(p => (
-                                    <button
-                                      key={p.id}
-                                      type="button"
-                                      onClick={() => selectProduct(index, p)}
-                                      className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                                    >
-                                      <p className="text-white/80 text-xs">{p.name}</p>
-                                      <p className="text-white/30 text-xs">
-                                        {formatCurrency(p.salePrice)} · estoque: {p.stock}
-                                      </p>
-                                    </button>
-                                  ))}
+                          {item.itemType === 'PRODUCT' && item.description && !item.productId && (
+                            <div className="absolute top-[60px] left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg z-20 max-h-44 overflow-y-auto shadow-lg">
+                              {loadingProducts ? (
+                                <p className="text-white/30 text-xs px-3 py-2">Carregando produtos...</p>
+                              ) : productSuggestions.length === 0 ? (
+                                <p className="text-white/30 text-xs px-3 py-2">Nenhum produto encontrado</p>
+                              ) : (
+                                productSuggestions.map(p => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => selectProduct(index, p)}
+                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                  >
+                                    <p className="text-white/80 text-xs">{p.name}</p>
+                                    <p className="text-white/30 text-xs">
+                                      {formatCurrency(p.salePrice)} · estoque: {p.stock}
+                                    </p>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
 
-                                {products.filter(p => p.name.toLowerCase().includes(item.description.toLowerCase())).length === 0 && (
-                                  <p className="text-white/30 text-xs px-3 py-2">Nenhum produto encontrado</p>
-                                )}
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="relative">
-                            <input
-                              value={item.categorySearch}
-                              onChange={e => {
-                                updateItem(index, 'categorySearch', e.target.value)
-                                updateItem(index, 'categoryId', '')
-                              }}
-                              placeholder="Categoria (opcional)"
-                              className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
-                            />
-
-                            {item.categorySearch && !item.categoryId && (
-                              <div className="absolute top-full left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg mt-0.5 z-20 max-h-32 overflow-y-auto shadow-lg">
-                                {categories
-                                  .filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase()))
-                                  .slice(0, 5)
-                                  .map(c => (
-                                    <button
-                                      key={c.id}
-                                      type="button"
-                                      onClick={() => selectCategory(index, c)}
-                                      className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                                    >
-                                      <p className="text-white/80 text-xs">{c.name}</p>
-                                    </button>
-                                  ))}
-
-                                {categories.filter(c => c.name.toLowerCase().includes(item.categorySearch.toLowerCase())).length === 0 && (
-                                  <p className="text-white/30 text-xs px-3 py-2">Nenhuma categoria encontrada</p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {item.itemType === 'SERVICE' && (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/30 text-xs">Descrição</label>
-                        <input
-                          value={item.description}
-                          onChange={e => updateItem(index, 'description', e.target.value)}
-                          placeholder="Ex: Mão de obra Gol G5"
-                          required
-                          className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
-                        />
-                      </div>
-                    )}
-
-                    <div className={`grid gap-2 ${item.itemType === 'SERVICE' ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/30 text-xs">Qtd</label>
-                        <input
-                          value={item.quantity}
-                          onChange={e => updateItem(index, 'quantity', e.target.value)}
-                          type="number"
-                          min="1"
-                          required
-                          className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm text-center outline-none focus:border-[#2563eb]"
-                        />
+                          {item.itemType === 'SERVICE' && item.description && !item.linkedServiceProductId && (
+                            <div className="absolute top-[60px] left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg z-20 max-h-44 overflow-y-auto shadow-lg">
+                              {loadingProducts ? (
+                                <p className="text-white/30 text-xs px-3 py-2">Carregando serviços...</p>
+                              ) : serviceSuggestions.length === 0 ? (
+                                <p className="text-white/30 text-xs px-3 py-2">
+                                  Nenhum serviço cadastrado encontrado. Você pode continuar preenchendo manualmente.
+                                </p>
+                              ) : (
+                                serviceSuggestions.map(p => (
+                                  <button
+                                    key={p.id}
+                                    type="button"
+                                    onClick={() => selectServiceProduct(index, p)}
+                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                  >
+                                    <p className="text-white/80 text-xs">{p.name}</p>
+                                    <p className="text-white/30 text-xs">
+                                      {p.categoryName ?? 'Sem categoria'} · venda: {formatCurrency(p.salePrice)}
+                                    </p>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {item.itemType === 'SERVICE' && (
-                        <div className="flex flex-col gap-1">
-                          <label className="text-white/30 text-xs">Custo (opc.)</label>
+                        <div className="flex flex-col gap-1 relative">
+                          <label className="text-white/30 text-xs">Categoria do serviço</label>
                           <input
-                            value={item.serviceCost}
-                            onChange={e => updateItem(index, 'serviceCost', e.target.value)}
-                            type="number"
-                            step="0.01"
-                            placeholder="0,00"
+                            value={item.categorySearch}
+                            onChange={e => {
+                              updateItem(index, 'categorySearch', e.target.value)
+                              updateItem(index, 'categoryId', '')
+                            }}
+                            placeholder="Buscar categoria..."
                             className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
                           />
+
+                          {item.categorySearch && !item.categoryId && (
+                            <div className="absolute top-full left-0 right-0 bg-[#13151f] border border-white/10 rounded-lg mt-0.5 z-20 max-h-36 overflow-y-auto shadow-lg">
+                              {categorySuggestions.length === 0 ? (
+                                <p className="text-white/30 text-xs px-3 py-2">Nenhuma categoria encontrada</p>
+                              ) : (
+                                categorySuggestions.map(c => (
+                                  <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => selectCategory(index, c)}
+                                    className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+                                  >
+                                    <p className="text-white/80 text-xs">{c.name}</p>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      <div className="flex flex-col gap-1">
-                        <label className="text-white/30 text-xs">Preço unit.</label>
-                        <input
-                          value={item.unitPrice}
-                          onChange={e => updateItem(index, 'unitPrice', e.target.value)}
-                          type="number"
-                          step="0.01"
-                          placeholder="0,00"
-                          required
-                          className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
-                        />
-                      </div>
-                    </div>
+                      <div className={`grid gap-2 ${item.itemType === 'SERVICE' ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-white/30 text-xs">Qtd</label>
+                          <input
+                            value={item.quantity}
+                            onChange={e => updateItem(index, 'quantity', e.target.value)}
+                            type="number"
+                            min="1"
+                            required
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm text-center outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
 
-                    {items.length > 1 && (
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-white/20 hover:text-red-400 transition-colors text-xs"
-                        >
-                          Remover item
-                        </button>
+                        {item.itemType === 'SERVICE' && (
+                          <div className="flex flex-col gap-1">
+                            <label className="text-white/30 text-xs">Custo (opc.)</label>
+                            <input
+                              value={item.serviceCost}
+                              onChange={e => updateItem(index, 'serviceCost', e.target.value)}
+                              type="number"
+                              step="0.01"
+                              placeholder="0,00"
+                              className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                            />
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1">
+                          <label className="text-white/30 text-xs">Preço unit.</label>
+                          <input
+                            value={item.unitPrice}
+                            onChange={e => updateItem(index, 'unitPrice', e.target.value)}
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            required
+                            className="w-full bg-[#0a0c14] border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-[#2563eb]"
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {items.length > 1 && (
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => removeItem(index)}
+                            className="text-white/20 hover:text-red-400 transition-colors text-xs"
+                          >
+                            Remover item
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
 
                 <button
                   type="button"
@@ -657,14 +804,14 @@ function FragmentSaleRow({
                       {item.itemType === 'PRODUCT' ? 'Produto' : 'Serviço'}
                     </span>
                     <span className="text-white/70 text-xs">{item.description}</span>
-                    <span className="text-white/30 text-xs">× {item.quantity}</span>
                   </div>
 
                   <div className="flex items-center gap-3">
+                    <span className="text-white/30 text-xs">× {item.quantity}</span>
+                    <span className="text-white/40 text-xs">{formatCurrency(item.unitPrice)}/un</span>
                     {item.serviceCost != null && (
                       <span className="text-white/30 text-xs">custo: {formatCurrency(item.serviceCost)}</span>
                     )}
-                    <span className="text-white/40 text-xs">{formatCurrency(item.unitPrice)}/un</span>
                     <span className="text-white/70 text-xs font-medium">{formatCurrency(item.totalPrice)}</span>
                   </div>
                 </div>
