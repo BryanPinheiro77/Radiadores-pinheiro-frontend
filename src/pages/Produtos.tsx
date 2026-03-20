@@ -286,7 +286,7 @@ function Produtos() {
               <thead>
                 <tr className="border-b border-white/5 align-top">
                   <th className="text-left px-4 py-3 text-white/30 font-normal">Nome</th>
-                  <th className="text-left px-4 py-3 text-white/30 font-normal hidden lg:table-cell">
+                  <th className="text-left px-4 py-3 text-white/30 font-normal">
                     Categoria
                   </th>
                   <th className="text-right px-4 py-3 text-white/30 font-normal hidden md:table-cell">
@@ -321,7 +321,7 @@ function Produtos() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 text-white/40 text-sm leading-5 hidden lg:table-cell break-words whitespace-normal">
+                    <td className="px-4 py-3 text-white/40 text-sm leading-5 break-words whitespace-normal">
                       {product.categoryName ?? '—'}
                     </td>
 
