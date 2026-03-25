@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import api from '../api/axios'
 import type { Category, Product, Page } from '../types'
 
@@ -196,8 +196,7 @@ export default function Reposicao() {
       .then(res => {
         setOrders(
           res.data.sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )
         )
       })
@@ -360,14 +359,14 @@ export default function Reposicao() {
               <table className="w-full min-w-[720px] text-sm">
                 <thead>
                   <tr className="border-b border-white/5">
-                    <th className="text-left px-3 py-2 text-white/30 font-normal w-8"></th>
-                    <th className="text-left px-3 py-2 text-white/30 font-normal">Produto</th>
-                    <th className="text-left px-3 py-2 text-white/30 font-normal hidden md:table-cell">Categoria</th>
-                    <th className="text-center px-3 py-2 text-white/30 font-normal">Atual</th>
-                    <th className="text-center px-3 py-2 text-white/30 font-normal">Mínimo</th>
-                    <th className="text-center px-3 py-2 text-white/30 font-normal">Sugerido</th>
-                    <th className="text-center px-3 py-2 text-white/30 font-normal">Pedir</th>
-                    <th className="text-right px-3 py-2 text-white/30 font-normal w-8"></th>
+                    <th className="w-10 px-3 py-2 text-left text-white/30 font-normal"></th>
+                    <th className="px-3 py-2 text-left text-white/30 font-normal">Produto</th>
+                    <th className="px-3 py-2 text-left text-white/30 font-normal hidden md:table-cell">Categoria</th>
+                    <th className="w-20 px-3 py-2 text-center text-white/30 font-normal">Atual</th>
+                    <th className="w-20 px-3 py-2 text-center text-white/30 font-normal">Mínimo</th>
+                    <th className="w-24 px-3 py-2 text-center text-white/30 font-normal">Sugerido</th>
+                    <th className="w-24 px-3 py-2 text-center text-white/30 font-normal">Pedir</th>
+                    <th className="w-10 px-3 py-2 text-right text-white/30 font-normal"></th>
                   </tr>
                 </thead>
 
@@ -390,7 +389,7 @@ export default function Reposicao() {
                         {item.productName}
                       </td>
 
-                      <td className="px-3 py-2 text-white/40 hidden md:table-cell">
+                      <td className="px-3 py-2 text-white/40 hidden md:table-cell whitespace-nowrap">
                         {item.categoryName ?? '—'}
                       </td>
 
@@ -475,44 +474,46 @@ export default function Reposicao() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="border-b border-white/5">
-                  <th className="text-left px-4 py-3 text-white/30 font-normal w-6"></th>
-                  <th className="text-left px-4 py-3 text-white/30 font-normal">Data</th>
-                  <th className="text-left px-4 py-3 text-white/30 font-normal hidden md:table-cell">
+                  <th className="w-10 px-4 py-3 text-left text-white/30 font-normal"></th>
+                  <th className="w-40 px-4 py-3 text-left text-white/30 font-normal">Data</th>
+                  <th className="px-4 py-3 text-left text-white/30 font-normal hidden md:table-cell">
                     Observações
                   </th>
-                  <th className="text-center px-4 py-3 text-white/30 font-normal">Itens</th>
-                  <th className="text-right px-4 py-3 text-white/30 font-normal">PDF</th>
+                  <th className="w-28 px-4 py-3 text-center text-white/30 font-normal">Itens</th>
+                  <th className="w-24 px-4 py-3 text-right text-white/30 font-normal">PDF</th>
                 </tr>
               </thead>
 
               <tbody>
                 {orders.map(order => (
-                  <tbody key={order.id}>
+                  <Fragment key={order.id}>
                     <tr
-                      className="border-b border-white/5 hover:bg-white/2 cursor-pointer"
+                      className="border-b border-white/5 hover:bg-white/5 cursor-pointer"
                       onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
                     >
-                      <td className="px-4 py-3 text-white/30 text-xs">
+                      <td className="px-4 py-3 text-white/30 text-xs align-middle">
                         {expandedOrder === order.id ? '▾' : '▸'}
                       </td>
 
-                      <td className="px-4 py-3 text-white/70 whitespace-nowrap">
+                      <td className="px-4 py-3 text-white/70 whitespace-nowrap align-middle">
                         {new Date(order.createdAt).toLocaleDateString('pt-BR')}
                       </td>
 
-                      <td className="px-4 py-3 text-white/40 hidden md:table-cell">
-                        {order.notes ?? '—'}
+                      <td className="px-4 py-3 text-white/40 hidden md:table-cell align-middle">
+                        <div className="truncate max-w-[420px]">
+                          {order.notes ?? '—'}
+                        </div>
                       </td>
 
-                      <td className="px-4 py-3 text-center text-white/50 whitespace-nowrap">
+                      <td className="px-4 py-3 text-center text-white/50 whitespace-nowrap align-middle">
                         {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}
                       </td>
 
                       <td
-                        className="px-4 py-3 text-right whitespace-nowrap"
+                        className="px-4 py-3 text-right whitespace-nowrap align-middle"
                         onClick={e => e.stopPropagation()}
                       >
                         <button
@@ -525,7 +526,7 @@ export default function Reposicao() {
                     </tr>
 
                     {expandedOrder === order.id && (
-                      <tr className="border-b border-white/5 bg-white/2">
+                      <tr className="border-b border-white/5 bg-white/[0.03]">
                         <td colSpan={5} className="px-8 py-3">
                           <div className="flex flex-col gap-1">
                             <p className="text-white/20 text-xs mb-1">Itens do pedido</p>
@@ -533,10 +534,10 @@ export default function Reposicao() {
                             {order.items.map((item, idx) => (
                               <div
                                 key={idx}
-                                className="flex items-center justify-between py-1 border-b border-white/5 last:border-0 gap-4"
+                                className="flex flex-col md:flex-row md:items-center md:justify-between py-2 border-b border-white/5 last:border-0 gap-2 md:gap-4"
                               >
                                 <div className="flex items-center gap-3 min-w-0">
-                                  <span className="text-white/70 text-xs whitespace-nowrap">
+                                  <span className="text-white/70 text-xs break-words">
                                     {item.productName}
                                   </span>
 
@@ -547,7 +548,7 @@ export default function Reposicao() {
                                   )}
                                 </div>
 
-                                <div className="flex items-center gap-4 text-xs whitespace-nowrap">
+                                <div className="flex flex-wrap items-center gap-4 text-xs">
                                   <span className="text-white/30">
                                     Estoque: <span className="text-red-400">{item.currentStock}</span>
                                   </span>
@@ -567,7 +568,7 @@ export default function Reposicao() {
                         </td>
                       </tr>
                     )}
-                  </tbody>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
