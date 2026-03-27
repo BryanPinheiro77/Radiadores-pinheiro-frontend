@@ -34,6 +34,13 @@ function Produtos() {
     description: ''
   })
 
+  const normalizeText = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+
   async function loadAllProducts() {
     setLoading(true)
 
@@ -188,13 +195,19 @@ function Produtos() {
     : null
 
   const filteredProducts = useMemo(() => {
-    return allProducts.filter(product => {
-      const matchesSearch = product.name
-        .toLowerCase()
-        .includes(search.toLowerCase())
+    const searchTerms = normalizeText(search)
+      .split(/\s+/)
+      .filter(Boolean)
 
-      const matchesCategory = !categoryFilter
-        || product.categoryName === selectedCategoryName
+    return allProducts.filter(product => {
+      const productName = normalizeText(product.name)
+
+      const matchesSearch =
+        searchTerms.length === 0 ||
+        searchTerms.every(term => productName.includes(term))
+
+      const matchesCategory =
+        !categoryFilter || product.categoryName === selectedCategoryName
 
       return matchesSearch && matchesCategory
     })
