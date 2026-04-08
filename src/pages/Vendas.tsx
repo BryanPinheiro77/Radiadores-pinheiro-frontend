@@ -457,15 +457,15 @@ function Vendas() {
                 {items.map((item, index) => {
                   const productSuggestions = regularProducts
                     .filter(p => normalizeText(p.name).includes(normalizeText(item.description)))
-                    .slice(0, 8)
+                    .slice(0, 20)
 
                   const serviceSuggestions = serviceProducts
                     .filter(p => normalizeText(p.name).includes(normalizeText(item.description)))
-                    .slice(0, 8)
+                    .slice(0, 20)
 
                   const categorySuggestions = categories
                     .filter(c => normalizeText(c.name).includes(normalizeText(item.categorySearch)))
-                    .slice(0, 6)
+                    .slice(0, 10)
 
                   return (
                     <div key={index} className="border border-white/10 rounded-xl p-3 flex flex-col gap-3">
