@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../api/axios'
 import type { Product, Category, Page } from '../types'
 
 const PAGE_SIZE = 20
+const SEARCH_DEBOUNCE_MS = 400
 
 function Produtos() {
-  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [showCategoryModal, setShowCategoryModal] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
@@ -34,41 +37,28 @@ function Produtos() {
     description: ''
   })
 
-  const normalizeText = (value: string) =>
-    value
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-
-  async function loadAllProducts() {
+  async function loadProducts(currentPage: number, currentSearch: string, currentCategory: string) {
     setLoading(true)
 
     try {
-      const pageSize = 50
-      let currentPage = 0
-      let totalPages = 1
-      const all: Product[] = []
+      const params = new URLSearchParams()
+      params.set('page', String(currentPage))
+      params.set('size', String(PAGE_SIZE))
+      params.set('sort', 'name,asc')
 
-      while (currentPage < totalPages) {
-        const res = await api.get<Page<Product>>(
-          `/products?page=${currentPage}&size=${pageSize}&sort=name,asc`
-        )
-
-        all.push(...res.data.content)
-        totalPages = res.data.totalPages
-        currentPage++
+      if (currentSearch.trim()) {
+        params.set('search', currentSearch.trim())
       }
 
-      const unique = Array.from(
-        new Map(all.map(product => [product.id, product])).values()
-      )
+      if (currentCategory) {
+        params.set('categoryId', currentCategory)
+      }
 
-      unique.sort((a, b) =>
-        a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
-      )
+      const res = await api.get<Page<Product>>(`/products?${params.toString()}`)
 
-      setAllProducts(unique)
+      setProducts(res.data.content)
+      setTotalPages(Math.max(1, res.data.totalPages))
+      setPage(res.data.number)
     } finally {
       setLoading(false)
     }
@@ -80,12 +70,19 @@ function Produtos() {
 
   useEffect(() => {
     loadCategories()
-    loadAllProducts()
   }, [])
 
   useEffect(() => {
-    setPage(0)
-  }, [search, categoryFilter])
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, SEARCH_DEBOUNCE_MS)
+
+    return () => clearTimeout(timeout)
+  }, [search])
+
+  useEffect(() => {
+    loadProducts(page, debouncedSearch, categoryFilter)
+  }, [page, debouncedSearch, categoryFilter])
 
   function openCreate() {
     setEditing(null)
@@ -144,7 +141,7 @@ function Produtos() {
       }
 
       setShowModal(false)
-      await loadAllProducts()
+      await loadProducts(page, debouncedSearch, categoryFilter)
     } finally {
       setSubmitting(false)
     }
@@ -152,13 +149,22 @@ function Produtos() {
 
   async function handleToggle(id: number) {
     await api.patch(`/products/${id}/toggle-active`)
-    await loadAllProducts()
+    await loadProducts(page, debouncedSearch, categoryFilter)
   }
 
   async function handleDelete(id: number) {
     if (!confirm('Deletar produto?')) return
+
     await api.delete(`/products/${id}`)
-    await loadAllProducts()
+
+    const isLastItemOnPage = products.length === 1 && page > 0
+
+    if (isLastItemOnPage) {
+      setPage(prev => prev - 1)
+      return
+    }
+
+    await loadProducts(page, debouncedSearch, categoryFilter)
   }
 
   async function handleCategorySubmit(e: React.FormEvent) {
@@ -177,7 +183,7 @@ function Produtos() {
       setCategoryForm({ name: '', description: '' })
       setEditingCategory(null)
       loadCategories()
-      await loadAllProducts()
+      await loadProducts(page, debouncedSearch, categoryFilter)
     } finally {
       setSubmittingCategory(false)
     }
@@ -185,47 +191,18 @@ function Produtos() {
 
   async function handleDeleteCategory(id: number) {
     if (!confirm('Deletar categoria?')) return
+
     await api.delete(`/categories/${id}`)
     loadCategories()
-    await loadAllProducts()
-  }
 
-  const selectedCategoryName = categoryFilter
-    ? categories.find(c => String(c.id) === categoryFilter)?.name
-    : null
-
-  const filteredProducts = useMemo(() => {
-    const searchTerms = normalizeText(search)
-      .split(/\s+/)
-      .filter(Boolean)
-
-    return allProducts.filter(product => {
-      const productName = normalizeText(product.name)
-
-      const matchesSearch =
-        searchTerms.length === 0 ||
-        searchTerms.every(term => productName.includes(term))
-
-      const matchesCategory =
-        !categoryFilter || product.categoryName === selectedCategoryName
-
-      return matchesSearch && matchesCategory
-    })
-  }, [allProducts, search, categoryFilter, selectedCategoryName])
-
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
-
-  const paginatedProducts = useMemo(() => {
-    const start = page * PAGE_SIZE
-    const end = start + PAGE_SIZE
-    return filteredProducts.slice(start, end)
-  }, [filteredProducts, page])
-
-  useEffect(() => {
-    if (page > totalPages - 1) {
+    if (categoryFilter === String(id)) {
+      setCategoryFilter('')
       setPage(0)
+      return
     }
-  }, [page, totalPages])
+
+    await loadProducts(page, debouncedSearch, categoryFilter)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -255,14 +232,20 @@ function Produtos() {
       <div className="flex gap-2 flex-wrap">
         <input
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={e => {
+            setSearch(e.target.value)
+            setPage(0)
+          }}
           placeholder="Buscar por nome..."
           className="bg-[#0d0f18] border border-white/10 text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#2563eb] flex-1 min-w-[160px]"
         />
 
         <select
           value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value)}
+          onChange={e => {
+            setCategoryFilter(e.target.value)
+            setPage(0)
+          }}
           className="bg-[#0d0f18] border border-white/10 text-white/60 text-sm rounded-lg px-3 py-2 outline-none"
         >
           <option value="">Todas as categorias</option>
@@ -279,7 +262,7 @@ function Produtos() {
           <div className="flex items-center justify-center h-32 text-white/30 text-sm">
             Carregando...
           </div>
-        ) : paginatedProducts.length === 0 ? (
+        ) : products.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-white/30 text-sm">
             Nenhum produto encontrado
           </div>
@@ -315,7 +298,7 @@ function Produtos() {
               </thead>
 
               <tbody>
-                {paginatedProducts.map(product => (
+                {products.map(product => (
                   <tr
                     key={product.id}
                     className="border-b border-white/5 hover:bg-white/2 align-top"
@@ -398,29 +381,27 @@ function Produtos() {
         )}
       </div>
 
-      {filteredProducts.length > 0 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
-            className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
-          >
-            ← Anterior
-          </button>
+      <div className="flex items-center justify-center gap-2">
+        <button
+          onClick={() => setPage(p => Math.max(0, p - 1))}
+          disabled={page === 0 || loading}
+          className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
+        >
+          ← Anterior
+        </button>
 
-          <span className="text-white/30 text-sm">
-            {page + 1} / {totalPages}
-          </span>
+        <span className="text-white/30 text-sm">
+          {page + 1} / {totalPages}
+        </span>
 
-          <button
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-            disabled={page >= totalPages - 1}
-            className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
-          >
-            Próximo →
-          </button>
-        </div>
-      )}
+        <button
+          onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+          disabled={page >= totalPages - 1 || loading}
+          className="text-white/40 hover:text-white disabled:opacity-20 text-sm px-3 py-1"
+        >
+          Próximo →
+        </button>
+      </div>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
